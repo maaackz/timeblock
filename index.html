@@ -37,6 +37,11 @@
       </select>
     </label>
     <label>Background Color: <input type="color" id="modalColor" onchange="updatePreview()" /></label>
+    <label>Background Image:
+        <input type="file" id="modalBgImage" accept="image/*">
+    </label>
+    <label>Background Image URL: <input type="text" id="modalBgImageUrl" placeholder="https://..." /></label>
+
     <label>Text Color: <input type="color" id="modalTextColor" value="#ffffff" onchange="updatePreview()" /></label>
     <div id="colorPreview">Preview</div>
     <button id="saveBtn">Save</button>
