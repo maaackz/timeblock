@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8' />
+  <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles/main.css" />
+</head>
+<body>
+    <div id="menuWrapper">
+        <button id="menuToggle">&#9776;</button>
+        <div id="menuDropdown" class="hidden">
+            <button id="importBtn">Import JSON</button>
+            <input type="file" id="fileInput" accept=".json" style="display: none;">
+            <button id="exportBtn">Export JSON</button>
+        </div>
+    </div>
+
+
+
+  <div id='calendar'></div>
+
+  <div id="modalBackdrop"></div>
+  <div id="eventModal">
+    <label>Class Name: <input type="text" id="modalTitle" /></label>
+    <label>Start Time: <input type="time" id="modalStartTime" /></label>
+    <label>End Time: <input type="time" id="modalEndTime" /></label>
+    <label>Repeat on Days:<br>
+      <select id="modalDaysOfWeek" multiple>
+        <option value="0">Sunday</option>
+        <option value="1">Monday</option>
+        <option value="2">Tuesday</option>
+        <option value="3">Wednesday</option>
+        <option value="4">Thursday</option>
+        <option value="5">Friday</option>
+        <option value="6">Saturday</option>
+      </select>
+    </label>
+    <label>Background Color: <input type="color" id="modalColor" onchange="updatePreview()" /></label>
+    <label>Text Color: <input type="color" id="modalTextColor" value="#ffffff" onchange="updatePreview()" /></label>
+    <div id="colorPreview">Preview</div>
+    <button id="saveBtn">Save</button>
+    <button id="deleteBtn">Delete</button>
+    <button id="cancelBtn">Cancel</button>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="scripts/script.js"></script>
+</body>
+</html>
