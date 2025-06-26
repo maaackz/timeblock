@@ -18,17 +18,29 @@ document.addEventListener('DOMContentLoaded', function () {
     ];
 
     function ensureUID(events) {
-        return events.map(ev => ({ ...ev, uid: ev.uid || generateUID(), group: ev.group || generateUID() }));
+        return events.map(ev => ({
+            ...ev,
+            uid: ev.uid || generateUID(),
+            group: ev.group || generateUID(),
+            exceptionDates: ev.exceptionDates || []
+        }));
     }
+
 
     if (!localStorage.getItem('calendarEvents')) {
         localStorage.setItem('calendarEvents', JSON.stringify(defaultEvents));
     } else {
-        const current = ensureUID(JSON.parse(localStorage.getItem('calendarEvents')));
-        localStorage.setItem('calendarEvents', JSON.stringify(current));
-    }
+        const rawEvents = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+        const sanitized = rawEvents.map(ev => ({
+            ...ev,
+            uid: ev.uid || generateUID(),
+            group: ev.group || generateUID(),
+            exceptionDates: ev.exceptionDates || []
+        }));
+        localStorage.setItem('calendarEvents', JSON.stringify(sanitized));
 
-    function expandRecurring(events) {
+    }
+    function expandRecurring(events, viewStart, viewEnd) {
         const groupedEvents = {};
         const result = [];
 
@@ -40,30 +52,49 @@ document.addEventListener('DOMContentLoaded', function () {
 
         for (const group in groupedEvents) {
             const groupEvents = groupedEvents[group];
+            const exceptionDates = new Set(groupEvents.flatMap(ev => ev.exceptionDates || []).map(d => new Date(d).toDateString()));
+
             groupEvents.forEach(ev => {
-                if (ev.daysOfWeek && ev.startTime && ev.endTime) {
-                    result.push({
-                        id: ev.uid,
-                        title: ev.title,
-                        color: ev.color,
-                        textColor: ev.textColor,
-                        allDay: false,
-                        daysOfWeek: ev.daysOfWeek,
-                        startTime: ev.startTime,
-                        endTime: ev.endTime,
-                        ...(ev.startRecur ? { startRecur: ev.startRecur } : {}),
-                        ...(ev.endRecur ? { endRecur: ev.endRecur } : {}),
-                        display: 'block',
-                        extendedProps: {
-                            bgImage: ev.bgImage || null,
-                            group: ev.group,
-                            daysOfWeek: ev.daysOfWeek,
-                            startTime: ev.startTime,
-                            endTime: ev.endTime,
-                            startRecur: ev.startRecur || null,
-                            endRecur: ev.endRecur || null
+                const daysOfWeek = (ev.daysOfWeek || []).map(Number);
+
+                if (daysOfWeek.length && ev.startTime && ev.endTime) {
+                    const recurStart = ev.startRecur ? new Date(ev.startRecur) : new Date('1970-01-01');
+                    const recurEnd = ev.endRecur ? new Date(ev.endRecur) : new Date('9999-12-31');
+
+                    const loopStart = new Date(Math.max(viewStart, recurStart));
+                    const loopEnd = new Date(Math.min(viewEnd, recurEnd));
+
+                    for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
+                        const day = d.getDay();
+                        if (daysOfWeek.includes(day) && !exceptionDates.has(d.toDateString())) {
+                            const eventDate = new Date(d);
+                            const [sh, sm] = ev.startTime.split(':').map(Number);
+                            const [eh, em] = ev.endTime.split(':').map(Number);
+                            const start = new Date(eventDate);
+                            const end = new Date(eventDate);
+                            start.setHours(sh, sm);
+                            end.setHours(eh, em);
+                            result.push({
+                                id: ev.uid,
+                                title: ev.title,
+                                start: start.toISOString(),
+                                end: end.toISOString(),
+                                color: ev.color,
+                                textColor: ev.textColor,
+                                allDay: false,
+                                extendedProps: {
+                                    bgImage: ev.bgImage || null,
+                                    group: ev.group,
+                                    daysOfWeek: ev.daysOfWeek,
+                                    startTime: ev.startTime,
+                                    endTime: ev.endTime,
+                                    startRecur: ev.startRecur || null,
+                                    endRecur: ev.endRecur || null,
+                                    exceptionDates: ev.exceptionDates || []
+                                }
+                            });
                         }
-                    });
+                    }
                 } else {
                     result.push({
                         id: ev.uid,
@@ -84,6 +115,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return result;
     }
+
 
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
@@ -108,7 +140,12 @@ document.addEventListener('DOMContentLoaded', function () {
             center: 'title',
             right: 'timeGridWeek,timeGridDay'
         },
-        events: expandRecurring(ensureUID(JSON.parse(localStorage.getItem('calendarEvents')))),
+        events: function (info, successCallback, failureCallback) {
+            const stored = ensureUID(getStoredEvents());
+            const renderedEvents = expandRecurring(stored, info.start, info.end);
+            successCallback(renderedEvents);
+        },
+
 
         select(info) {
             selectedInfo = info;
@@ -161,7 +198,23 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tooltip = document.getElementById('eventTooltip');
                 if (!tooltip) return;
 
-                const allEvents = getStoredEvents().filter(e => e.title === info.event.title);
+                const viewStart = calendar.view.activeStart;
+                const viewEnd = calendar.view.activeEnd;
+
+                const allEvents = getStoredEvents().filter(e => {
+                    if (e.title !== info.event.title) return false;
+
+                    if (e.startRecur || e.endRecur) {
+                        const recurStart = e.startRecur ? new Date(e.startRecur) : null;
+                        const recurEnd = e.endRecur ? new Date(e.endRecur) : null;
+
+                        if (recurStart && viewEnd < recurStart) return false;
+                        if (recurEnd && viewStart > recurEnd) return false;
+                    }
+
+                    return true;
+                });
+
                 let totalMins = 0;
 
                 allEvents.forEach(e => {
@@ -242,8 +295,8 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         saveEvents(stored);
-        calendar.removeAllEvents();
-        calendar.addEventSource(expandRecurring(stored));
+        calendar.refetchEvents();
+
     }
 
     function formatTime(date) {
@@ -284,6 +337,11 @@ document.addEventListener('DOMContentLoaded', function () {
         const days = Array.from(document.getElementById('modalDaysOfWeek').selectedOptions).map(o => o.value);
         const startRecur = document.getElementById('modalStartRecur').value || null;
         const endRecur = document.getElementById('modalEndRecur').value || null;
+        const exceptionDates = document.getElementById('modalExceptions').value
+            .split('\n')
+            .map(s => s.trim())
+            .filter(Boolean);
+
 
         let stored = getStoredEvents();
 
@@ -302,10 +360,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 title,
                 start: selectedInfo.startStr,
                 end: selectedInfo.endStr,
+                exceptionDates,
                 allDay: false,
                 color,
                 textColor,
                 bgImage: imageData
+
             });
         } else if (days.length > 0) {
             days.forEach(dow => {
@@ -317,6 +377,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         daysOfWeek: [dow],
                         startTime,
                         endTime: '23:59',
+                        exceptionDates,
                         color,
                         textColor,
                         bgImage: imageData,
@@ -332,6 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         daysOfWeek: [nextDay.toString()],
                         startTime: '00:00',
                         endTime,
+                        exceptionDates,
                         color,
                         textColor,
                         bgImage: imageData,
@@ -347,6 +409,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         daysOfWeek: [dow],
                         startTime,
                         endTime,
+                        exceptionDates,
                         color,
                         textColor,
                         bgImage: imageData,
@@ -362,6 +425,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 title,
                 start: selectedEvent.startStr,
                 end: selectedEvent.endStr,
+                exceptionDates,
                 color,
                 textColor,
                 bgImage: imageData,
@@ -371,8 +435,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         saveEvents([...stored, ...newEvents]);
         closeModal();
-        calendar.removeAllEvents();
-        calendar.addEventSource(expandRecurring([...stored, ...newEvents]));
+        calendar.refetchEvents();
+
     }
 
 
@@ -381,11 +445,69 @@ document.addEventListener('DOMContentLoaded', function () {
             const stored = getStoredEvents();
             const filtered = stored.filter(ev => ev.group !== selectedEvent.extendedProps?.group);
             saveEvents(filtered);
-            calendar.removeAllEvents();
-            calendar.addEventSource(expandRecurring(filtered));
+            calendar.refetchEvents();
+
         }
         closeModal();
     }
+
+    function duplicateModalEvent() {
+        if (!selectedEvent) return;
+
+        const eventProps = selectedEvent.extendedProps || {};
+        const days = eventProps.daysOfWeek || [];
+        const startTime = eventProps.startTime || selectedEvent.startStr.slice(11, 16);
+        const endTime = eventProps.endTime || selectedEvent.endStr.slice(11, 16);
+        const startRecur = eventProps.startRecur || null;
+        const endRecur = eventProps.endRecur || null;
+        const bgImage = eventProps.bgImage || null;
+        const exceptionDates = eventProps.exceptionDates || [];
+
+
+        const newGroup = generateUID();
+        const newEvents = [];
+
+        if (days.length > 0) {
+            days.forEach(dow => {
+                if (startTime > endTime) {
+                    newEvents.push({
+                        uid: generateUID(), group: newGroup, title: selectedEvent.title,
+                        daysOfWeek: [dow], startTime, endTime: '23:59',
+                        color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
+                        bgImage, startRecur, endRecur, exceptionDates
+                    });
+                    const nextDay = (parseInt(dow) + 1) % 7;
+                    newEvents.push({
+                        uid: generateUID(), group: newGroup, title: selectedEvent.title,
+                        daysOfWeek: [nextDay.toString()], startTime: '00:00', endTime,
+                        color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
+                        bgImage, startRecur, endRecur, exceptionDates
+                    });
+                } else {
+                    newEvents.push({
+                        uid: generateUID(), group: newGroup, title: selectedEvent.title,
+                        daysOfWeek: [dow], startTime, endTime,
+                        color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
+                        bgImage, startRecur, endRecur, exceptionDates
+                    });
+                }
+            });
+        } else {
+            newEvents.push({
+                uid: generateUID(), title: selectedEvent.title,
+                start: selectedEvent.startStr, end: selectedEvent.endStr,
+                color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
+                bgImage, exceptionDates
+            });
+        }
+
+        const stored = getStoredEvents();
+        saveEvents([...stored, ...newEvents]);
+        calendar.refetchEvents();
+
+        closeModal();
+    }
+
 
     function closeModal() {
         document.getElementById('eventModal').style.display = 'none';
@@ -396,6 +518,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalTitle').value = title;
         document.getElementById('modalStartTime').value = startTime;
         document.getElementById('modalEndTime').value = endTime;
+
         document.getElementById('modalColor').value = color;
         document.getElementById('modalTextColor').value = textColor;
 
@@ -408,7 +531,8 @@ document.addEventListener('DOMContentLoaded', function () {
             (selectedEvent?.extendedProps?.startRecur || '');
         document.getElementById('modalEndRecur').value =
             (selectedEvent?.extendedProps?.endRecur || '');
-
+        document.getElementById('modalExceptions').value =
+            (selectedEvent?.extendedProps?.exceptionDates || []).join('\n');
 
         updatePreview();
 
@@ -452,16 +576,19 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('menuDropdown').classList.toggle('hidden');
     });
 
-    document.getElementById('exportBtn').addEventListener('click', () => {
-        const events = localStorage.getItem('calendarEvents') || '[]';
-        const blob = new Blob([events], { type: 'application/json' });
+    document.getElementById('exportBtn').addEventListener('click', function () {
+        const events = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
+        const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
+
         const a = document.createElement('a');
         a.href = url;
         a.download = 'calendar-events.json';
         a.click();
+
         URL.revokeObjectURL(url);
     });
+
 
     document.getElementById('importBtn').addEventListener('click', () => {
         document.getElementById('fileInput').click();
@@ -475,8 +602,8 @@ document.addEventListener('DOMContentLoaded', function () {
             try {
                 const imported = JSON.parse(event.target.result);
                 localStorage.setItem('calendarEvents', JSON.stringify(imported));
-                calendar.removeAllEvents();
-                calendar.addEventSource(expandRecurring(imported));
+                calendar.refetchEvents();
+
             } catch (err) {
                 alert('Invalid JSON file.');
             }
@@ -485,6 +612,7 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     document.getElementById('saveBtn').addEventListener('click', saveModalEvent);
+    document.getElementById('duplicateBtn').addEventListener('click', duplicateModalEvent);
     document.getElementById('deleteBtn').addEventListener('click', deleteModalEvent);
     document.getElementById('cancelBtn').addEventListener('click', closeModal);
 });
