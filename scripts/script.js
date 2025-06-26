@@ -896,8 +896,8 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
         estimateLifetimeUsageChart();
     }
-    // Toggle settings panel
-    document.getElementById('openSettingsBtn').addEventListener('click', () => {
+    
+    function loadSettings(){
         const panel = document.getElementById('settingsPanel');
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 
@@ -906,8 +906,14 @@ ${percent(minsInYear, totalYearMins)}% of total year
         if (stored.birthDate) document.getElementById('birthDate').value = stored.birthDate;
         if (stored.lifespanYears) document.getElementById('lifespanYears').value = stored.lifespanYears;
         if (stored.deathDate) document.getElementById('deathDate').value = stored.deathDate;
+    }
+    // Toggle settings panel
+    document.getElementById('openSettingsBtn').addEventListener('click', () => {
+        loadSettings()
     });
 
+    loadSettings()
+    updateDashboardChart()
     // Auto-calculate death date from birth + lifespan
     function updateDeathDate() {
         const birthInput = document.getElementById('birthDate');
@@ -1216,5 +1222,5 @@ ${years.toFixed(2)} yrs
 
     }
 
-
+renderCustomTimeProgressBar()
 });

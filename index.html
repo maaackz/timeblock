@@ -5,6 +5,8 @@
     <meta charset='utf-8' />
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
     <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
+
     <link rel="stylesheet" href="styles/main.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
@@ -29,9 +31,10 @@
         </div>
     </div>
 
-    <div id='calendar'></div>
+    <main>
+<div id='calendar'></div>
 
-    <div id="dashboardView" style="display: none; padding: 1rem;">
+    <div id="dashboardView" style="padding: 1rem;">
         <h2>Dashboard</h2>
 
         <div id="customTimeProgress" style="margin-top: 2rem;">
@@ -75,7 +78,7 @@
 
 
 
-    <div id="settingsPanel" style="display: none;">
+    <div id="settingsPanel" style="display:none;">
         <label for="birthDate">Birth Date</label>
         <input type="datetime-local" id="birthDate">
 
@@ -88,6 +91,8 @@
         <button id="saveSettingsBtn">Save</button>
     </div>
 
+    </main>
+    
 
 
 

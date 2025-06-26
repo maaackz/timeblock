@@ -5,9 +5,15 @@ body {
     letter-spacing: -0.05rem;
 }
 
+/* main {
+    display: flex;
+    flex-direction: column;
+} */
+
 #calendar {
-    max-width: 100vw;
+    /* max-width: 100vw;
     height: 100vh;
+    max-height: 100vh; */
     margin: 0 auto;
 }
 
@@ -103,10 +109,15 @@ button {
     /* display: flex; */
     /* max-width: 500px; */
     /* width: 100vw; */
-    height: 500px;
+    height: fit-content;
+    /* max-height:500px; */
     margin: 0 auto;
     /* position: absolute; */
     /* left: 0; */
+}
+
+#settingsPanel{
+    height: 250px;
 }
 
 #activityPieChart {
@@ -124,14 +135,15 @@ button {
 }
 
 .time-progress-container {
-    max-width: 600px;
+    max-width: 100vw;
     margin: auto;
     font-family: sans-serif;
+    margin-bottom:25px;
 }
 
 .time-progress-main {
     display: flex;
-    height: 24px;
+    height: 30px;
     background-color: #ddd;
     margin-bottom: 6px;
 }
@@ -143,11 +155,11 @@ button {
 }
 
 .time-progress-spent {
-    background-color: #6cbf6c;
+    background-color: #b01515;
 }
 
 .time-progress-remaining {
-    background-color: #bbb;
+    background-color: #54e85d;
 }
 
 .time-sub-progress {
@@ -165,7 +177,7 @@ button {
 .awake-asleep-track {
     display: flex;
     width: 100%;
-    height: 8px;
+    height: 10px;
     border-radius: 0;
     /* overflow: hidden; */
 }
@@ -178,13 +190,31 @@ button {
     z-index: 1;
 }
 
+#awakeSpent {
+    background-color: #be8749;  
+}
+
+#awakeRemaining {
+background-color: #ff8800;  
+}
+
+
+#asleepSpent {
+background-color: #3f418e;  
+}
+
+#asleepRemaining {
+background-color: #0008fa;  
+}
+
+/* 
 .awake-bar {
     background-color: #4fc3f7;
 }
 
 .asleep-bar {
     background-color: #90a4ae;
-}
+} */
 
 .custom-tooltip {
     position: absolute;
