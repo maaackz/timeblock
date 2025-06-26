@@ -32,33 +32,107 @@
     </div>
 
     <main>
-<div id='calendar'></div>
+        <div id='calendar'></div>
 
-    <div id="dashboardView" style="padding: 1rem;">
-        <h2>Dashboard</h2>
+        <div id="dashboardView" style="padding: 1rem;">
+            <h2>Dashboard</h2>
 
-        <div id="customTimeProgress" style="margin-top: 2rem;">
-            <div class="time-progress-container">
-                <div class="time-progress-main">
-                    <div class="time-progress-spent" id="mainSpent" data-tooltip=""></div>
-                    <div class="time-progress-remaining" id="mainRemaining" data-tooltip=""></div>
-                </div>
-                <div class="time-sub-progress">
-                    <div class="sub-section" id="subSpent">
-                        <div class="awake-asleep-track">
-                            <div class="awake-bar" id="awakeSpent" data-tooltip=""></div>
-                            <div class="asleep-bar" id="asleepSpent" data-tooltip=""></div>
+            <div id="customTimeProgress" style="margin-top: 2rem;">
+                <div class="time-progress-container">
+                    <!-- Main Lifetime Bar -->
+                     <div class="mini-bar-title">Lifetime</div>
+                    <div class="time-progress-main">
+                        <div class="time-progress-spent" id="mainSpent"></div>
+                        <div class="time-progress-remaining" id="mainRemaining"></div>
+                    </div>
+                    <div class="time-sub-progress">
+                        <div class="sub-section" id="subSpent">
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeSpent" id="awakeSpent"></div>
+                                <div class="asleep-bar asleepSpent" id="asleepSpent"></div>
+                            </div>
+                        </div>
+                        <div class="sub-section" id="subRemaining">
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeRemaining" id="awakeRemaining"></div>
+                                <div class="asleep-bar asleepRemaining" id="asleepRemaining"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="sub-section" id="subRemaining">
-                        <div class="awake-asleep-track">
-                            <div class="awake-bar" id="awakeRemaining" data-tooltip=""></div>
-                            <div class="asleep-bar" id="asleepRemaining" data-tooltip=""></div>
+
+                    <!-- Mini Bars for Day, Week, Month, Year -->
+                    <!-- Mini Bars for Day, Week, Month, Year -->
+                    <div class="mini-bars">
+
+                        <!-- Day -->
+                        <div class="mini-bar" id="miniDay">
+                            <div class="mini-bar-title">Day</div>
+                            <div class="time-progress-main">
+                                <div class="time-progress-spent" id="daySpent"></div>
+                                <div class="time-progress-remaining" id="dayRemaining"></div>
+                            </div>
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeSpent" id="dayAwakeSpent"></div>
+                                <div class="asleep-bar asleepSpent" id="dayAsleepSpent"></div>
+                                <div class="awake-bar awakeRemaining" id="dayAwakeRemaining"></div>
+                                <div class="asleep-bar asleepRemaining" id="dayAsleepRemaining"></div>
+                            </div>
                         </div>
+
+                        <!-- Week -->
+                        <div class="mini-bar" id="miniWeek">
+                            <div class="mini-bar-title">Week</div>
+                            <div class="time-progress-main">
+                                <div class="time-progress-spent" id="weekSpent"></div>
+                                <div class="time-progress-remaining" id="weekRemaining"></div>
+                            </div>
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeSpent" id="weekAwakeSpent"></div>
+                                <div class="asleep-bar asleepSpent" id="weekAsleepSpent"></div>
+                                <div class="awake-bar awakeRemaining" id="weekAwakeRemaining"></div>
+                                <div class="asleep-bar asleepRemaining" id="weekAsleepRemaining"></div>
+                            </div>
+                        </div>
+
+                        <!-- Month -->
+                        <div class="mini-bar" id="miniMonth">
+                            <div class="mini-bar-title">Month</div>
+                            <div class="time-progress-main">
+                                <div class="time-progress-spent" id="monthSpent"></div>
+                                <div class="time-progress-remaining" id="monthRemaining"></div>
+                            </div>
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeSpent" id="monthAwakeSpent"></div>
+                                <div class="asleep-bar asleepSpent" id="monthAsleepSpent"></div>
+                                <div class="awake-bar awakeRemaining" id="monthAwakeRemaining"></div>
+                                <div class="asleep-bar asleepRemaining" id="monthAsleepRemaining"></div>
+                            </div>
+                        </div>
+
+                        <!-- Year -->
+                        <div class="mini-bar" id="miniYear">
+                            <div class="mini-bar-title">Year</div>
+                            <div class="time-progress-main">
+                                <div class="time-progress-spent" id="yearSpent"></div>
+                                <div class="time-progress-remaining" id="yearRemaining"></div>
+                            </div>
+                            <div class="awake-asleep-track">
+                                <div class="awake-bar awakeSpent" id="yearAwakeSpent"></div>
+                                <div class="asleep-bar asleepSpent" id="yearAsleepSpent"></div>
+                                <div class="awake-bar awakeRemaining" id="yearAwakeRemaining"></div>
+                                <div class="asleep-bar asleepRemaining" id="yearAsleepRemaining"></div>
+                            </div>
+                        </div>
+
                     </div>
+
+
                 </div>
             </div>
         </div>
+
+
+
 
 
 
@@ -74,25 +148,25 @@
 
 
         <div id="tagTotals" style="margin-top: 1rem;"></div>
-    </div>
+        </div>
 
 
 
-    <div id="settingsPanel" style="display:none;">
-        <label for="birthDate">Birth Date</label>
-        <input type="datetime-local" id="birthDate">
+        <div id="settingsPanel" style="display:none;">
+            <label for="birthDate">Birth Date</label>
+            <input type="datetime-local" id="birthDate">
 
-        <label for="lifespanYears">Lifespan (years)</label>
-        <input type="number" id="lifespanYears" step="0.01">
+            <label for="lifespanYears">Lifespan (years)</label>
+            <input type="number" id="lifespanYears" step="0.01">
 
-        <label for="deathDate">Estimated Death Date</label>
-        <input type="datetime-local" id="deathDate" readonly>
+            <label for="deathDate">Estimated Death Date</label>
+            <input type="datetime-local" id="deathDate" readonly>
 
-        <button id="saveSettingsBtn">Save</button>
-    </div>
+            <button id="saveSettingsBtn">Save</button>
+        </div>
 
     </main>
-    
+
 
 
 

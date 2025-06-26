@@ -1,7 +1,10 @@
+* {
+    font-family: monospace !important;
+}
 body {
     margin: 40px 10px;
     padding: 0;
-    font-family: monospace;
+    font-family: monospace !important;
     letter-spacing: -0.05rem;
 }
 
@@ -116,7 +119,7 @@ button {
     /* left: 0; */
 }
 
-#settingsPanel{
+#settingsPanel {
     height: 250px;
 }
 
@@ -135,17 +138,17 @@ button {
 }
 
 .time-progress-container {
-    max-width: 100vw;
-    margin: auto;
     font-family: sans-serif;
-    margin-bottom:25px;
+    margin-bottom: 25px;
+    width: 100%;
+    max-width: 100vw;
 }
 
 .time-progress-main {
     display: flex;
-    height: 30px;
+    height: 24px;
     background-color: #ddd;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
 .time-progress-spent,
@@ -179,42 +182,37 @@ button {
     width: 100%;
     height: 10px;
     border-radius: 0;
-    /* overflow: hidden; */
+    margin-bottom: 6px;
+}
+
+.mini-bar-title {
+    font-weight: bold;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
 }
 
 .awake-bar,
 .asleep-bar {
     height: 100%;
     transition: width 0.8s ease-in-out;
-    /* position: relative; */
-    z-index: 1;
+    min-width: 2px;
 }
 
-#awakeSpent {
-    background-color: #be8749;  
+.awakeSpent {
+    background-color: #be8749;
 }
 
-#awakeRemaining {
-background-color: #ff8800;  
+.awakeRemaining {
+    background-color: #ff8800;
 }
 
-
-#asleepSpent {
-background-color: #3f418e;  
+.asleepSpent {
+    background-color: #3f418e;
 }
 
-#asleepRemaining {
-background-color: #0008fa;  
+.asleepRemaining {
+    background-color: #0008fa;
 }
-
-/* 
-.awake-bar {
-    background-color: #4fc3f7;
-}
-
-.asleep-bar {
-    background-color: #90a4ae;
-} */
 
 .custom-tooltip {
     position: absolute;
@@ -233,15 +231,15 @@ background-color: #0008fa;
     display: none;
 }
 
-.awake-bar,
-.asleep-bar {
-    min-width: 2px;
-    /* Ensure hover area exists */
-    content: "";
+.mini-bars {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin-top: 2rem;
 }
 
-
-.awake-bar:hover,
-.asleep-bar:hover {
-    /* background-color: #ff0 !important; */
+.mini-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
 }

@@ -896,8 +896,8 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
         estimateLifetimeUsageChart();
     }
-    
-    function loadSettings(){
+
+    function loadSettings() {
         const panel = document.getElementById('settingsPanel');
         panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
 
@@ -1138,28 +1138,21 @@ ${years.toFixed(2)} yrs
         const spentPercent = (passedMins / totalMins) * 100;
         const remainingPercent = 100 - spentPercent;
 
-        // Main bar
         document.getElementById('mainSpent').style.width = `${spentPercent}%`;
         document.getElementById('mainRemaining').style.width = `${remainingPercent}%`;
 
-        // Awake/asleep bars
         const awakeSpentPercent = (awakePassed / passedMins) * 100;
         const asleepSpentPercent = 100 - awakeSpentPercent;
         const awakeRemainingPercent = (awakeRemaining / remainingMins) * 100;
         const asleepRemainingPercent = 100 - awakeRemainingPercent;
 
-
-        // Set width of sub containers first
         document.getElementById('subSpent').style.width = `${spentPercent}%`;
         document.getElementById('subRemaining').style.width = `${remainingPercent}%`;
-
-        // Then set inner awake/asleep bar widths RELATIVE TO THEIR OWN PARENT WIDTH
         document.getElementById('awakeSpent').style.width = `${awakeSpentPercent}%`;
         document.getElementById('asleepSpent').style.width = `${asleepSpentPercent}%`;
         document.getElementById('awakeRemaining').style.width = `${awakeRemainingPercent}%`;
         document.getElementById('asleepRemaining').style.width = `${asleepRemainingPercent}%`;
 
-        // Create tooltip div once
         let floatingTooltip = document.querySelector('.custom-tooltip');
         if (!floatingTooltip) {
             floatingTooltip = document.createElement('div');
@@ -1167,33 +1160,22 @@ ${years.toFixed(2)} yrs
             document.body.appendChild(floatingTooltip);
         }
 
-        // Tooltip content (optional, for better granularity)
         const format = (val) =>
             formatTimeUnits(val)
                 .split('\n')
-                .map(line => {
-                    // Extract number at the start and format it
-                    return line.replace(/^([\d,.]+)/, (_, num) =>
-                        Number(num.replace(/,/g, '')).toLocaleString()
-                    );
-                })
+                .map(line => line.replace(/^([\d,.]+)/, (_, num) => Number(num.replace(/,/g, '')).toLocaleString()))
                 .join('<br>');
 
-
-        const setTooltip = (id, label, val) => {
+        const setTooltip = (id, label, val, percent = null) => {
             const el = document.getElementById(id);
             if (!el) return;
 
-            const html = `<strong>${label}</strong><br>${format(val)}`;
+            let percentLine = percent !== null ? `<br><em>${percent.toFixed(1)}%</em>` : '';
+            const html = `<strong>${label}</strong><br>${format(val)}${percentLine}`;
 
-
-            el.addEventListener('mouseenter', e => {
+            el.addEventListener('mouseenter', () => {
                 floatingTooltip.innerHTML = html;
                 floatingTooltip.style.display = 'block';
-
-                const rect = el.getBoundingClientRect();
-                floatingTooltip.style.left = `${rect.left + rect.width / 2}px`;
-                floatingTooltip.style.top = `${rect.top - 40}px`;
             });
 
             el.addEventListener('mouseleave', () => {
@@ -1203,24 +1185,72 @@ ${years.toFixed(2)} yrs
 
 
         document.body.addEventListener('mousemove', e => {
-            const tooltip = floatingTooltip;
-            if (tooltip) {
-                tooltip.style.left = `${e.pageX + 15}px`;
-                tooltip.style.top = `${e.pageY + 15}px`;
+            if (floatingTooltip) {
+                floatingTooltip.style.left = `${e.pageX + 15}px`;
+                floatingTooltip.style.top = `${e.pageY + 15}px`;
             }
         });
 
-        setTooltip('mainSpent', 'Spent', passedMins);
-        setTooltip('mainRemaining', 'Remaining', remainingMins);
-        setTooltip('awakeSpent', 'Spent (Awake)', awakePassed);
-        setTooltip('asleepSpent', 'Spent (Asleep)', asleepPassed);
-        setTooltip('awakeRemaining', 'Remaining (Awake)', awakeRemaining);
-        setTooltip('asleepRemaining', 'Remaining (Asleep)', asleepRemaining);
+        setTooltip('mainSpent', 'Spent', passedMins, spentPercent);
+        setTooltip('mainRemaining', 'Remaining', remainingMins, remainingPercent);
+        setTooltip('awakeSpent', 'Spent (Awake)', awakePassed, awakeSpentPercent);
+        setTooltip('asleepSpent', 'Spent (Asleep)', asleepPassed, asleepSpentPercent);
+        setTooltip('awakeRemaining', 'Remaining (Awake)', awakeRemaining, awakeRemainingPercent);
+        setTooltip('asleepRemaining', 'Remaining (Asleep)', asleepRemaining, asleepRemainingPercent);
 
 
+        // === MINI BARS SETUP ===
 
+        const hour = now.getHours() + now.getMinutes() / 60;
+        const getMinsLeft = days => days * 24 * 60;
+
+        const minsLeftToday = getMinsLeft(1 - hour / 24);
+        const minsLeftWeek = getMinsLeft(7 - now.getDay() - hour / 24);
+        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const minsLeftMonth = getMinsLeft(daysInMonth - now.getDate() - hour / 24);
+        const endOfYear = new Date(now.getFullYear() + 1, 0, 1);
+        const minsLeftYear = (endOfYear - now) / (1000 * 60);
+
+        const setupMiniBar = (prefix, totalMins, minsLeftAwake, minsLeftAsleep) => {
+            const minsSpentAwake = (totalMins * (16 / 24)) - minsLeftAwake;
+            const minsSpentAsleep = (totalMins * (8 / 24)) - minsLeftAsleep;
+
+            const awakeSpentPct = (minsSpentAwake / totalMins) * 100;
+            const asleepSpentPct = (minsSpentAsleep / totalMins) * 100;
+            const awakeRemainingPct = (minsLeftAwake / totalMins) * 100;
+            const asleepRemainingPct = (minsLeftAsleep / totalMins) * 100;
+
+            // Main bar (spent vs remaining)
+            const spentPct = (minsSpentAwake + minsSpentAsleep) / totalMins * 100;
+            const remainingPct = 100 - spentPct;
+            document.getElementById(`${prefix}Spent`).style.width = `${spentPct}%`;
+            document.getElementById(`${prefix}Remaining`).style.width = `${remainingPct}%`;
+
+            // Awake/Asleep inner segments
+            document.getElementById(`${prefix}AwakeSpent`).style.width = `${awakeSpentPct}%`;
+            document.getElementById(`${prefix}AsleepSpent`).style.width = `${asleepSpentPct}%`;
+            document.getElementById(`${prefix}AwakeRemaining`).style.width = `${awakeRemainingPct}%`;
+            document.getElementById(`${prefix}AsleepRemaining`).style.width = `${asleepRemainingPct}%`;
+
+            const capitalizedPrefix = prefix.charAt(0).toUpperCase() + prefix.slice(1);
+
+            setTooltip(`${prefix}Spent`, `Spent`, minsSpentAwake + minsSpentAsleep, spentPct);
+            setTooltip(`${prefix}Remaining`, `Remaining`, minsLeftAwake + minsLeftAsleep, remainingPct);
+            setTooltip(`${prefix}AwakeSpent`, `Spent (Awake)`, minsSpentAwake, awakeSpentPct);
+            setTooltip(`${prefix}AsleepSpent`, `Spent (Asleep)`, minsSpentAsleep, asleepSpentPct);
+            setTooltip(`${prefix}AwakeRemaining`, `Remaining (Awake)`, minsLeftAwake, awakeRemainingPct);
+            setTooltip(`${prefix}AsleepRemaining`, `Remaining (Asleep)`, minsLeftAsleep, asleepRemainingPct);
+
+
+        };
+
+
+        setupMiniBar('day', 1440, minsLeftToday * (16 / 24), minsLeftToday * (8 / 24));
+        setupMiniBar('week', 10080, minsLeftWeek * (16 / 24), minsLeftWeek * (8 / 24));
+        setupMiniBar('month', daysInMonth * 24 * 60, minsLeftMonth * (16 / 24), minsLeftMonth * (8 / 24));
+        setupMiniBar('year', 365.25 * 24 * 60, minsLeftYear * (16 / 24), minsLeftYear * (8 / 24));
 
     }
 
-renderCustomTimeProgressBar()
+    renderCustomTimeProgressBar()
 });
