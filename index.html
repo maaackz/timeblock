@@ -6,6 +6,14 @@
     <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="styles/main.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+
+    <!-- Tagify CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
+    <!-- Tagify JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+
 </head>
 
 <body>
@@ -15,10 +23,74 @@
             <button id="importBtn">Import JSON</button>
             <input type="file" id="fileInput" accept=".json" style="display: none;">
             <button id="exportBtn">Export JSON</button>
+            <button id="toggleDashboardBtn">Toggle Dashboard</button>
+            <button id="openSettingsBtn">Settings</button>
+
         </div>
     </div>
 
     <div id='calendar'></div>
+
+    <div id="dashboardView" style="display: none; padding: 1rem;">
+        <h2>Dashboard</h2>
+
+        <div id="customTimeProgress" style="margin-top: 2rem;">
+            <div class="time-progress-container">
+                <div class="time-progress-main">
+                    <div class="time-progress-spent" id="mainSpent" data-tooltip=""></div>
+                    <div class="time-progress-remaining" id="mainRemaining" data-tooltip=""></div>
+                </div>
+                <div class="time-sub-progress">
+                    <div class="sub-section" id="subSpent">
+                        <div class="awake-asleep-track">
+                            <div class="awake-bar" id="awakeSpent" data-tooltip=""></div>
+                            <div class="asleep-bar" id="asleepSpent" data-tooltip=""></div>
+                        </div>
+                    </div>
+                    <div class="sub-section" id="subRemaining">
+                        <div class="awake-asleep-track">
+                            <div class="awake-bar" id="awakeRemaining" data-tooltip=""></div>
+                            <div class="asleep-bar" id="asleepRemaining" data-tooltip=""></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+
+
+        <label for="dashboardTagFilter">Filter by Tag:</label>
+        <input id="dashboardTagFilter" placeholder="e.g. study, exercise">
+
+        <div class="charts">
+            <canvas id="activityPieChart" height="300"></canvas>
+            <canvas id="lifetimeChart" height="1"></canvas>
+
+
+        </div>
+
+
+        <div id="tagTotals" style="margin-top: 1rem;"></div>
+    </div>
+
+
+
+    <div id="settingsPanel" style="display: none;">
+        <label for="birthDate">Birth Date</label>
+        <input type="datetime-local" id="birthDate">
+
+        <label for="lifespanYears">Lifespan (years)</label>
+        <input type="number" id="lifespanYears" step="0.01">
+
+        <label for="deathDate">Estimated Death Date</label>
+        <input type="datetime-local" id="deathDate" readonly>
+
+        <button id="saveSettingsBtn">Save</button>
+    </div>
+
+
+
+
 
     <div id="eventTooltip"
         style="display:none; position:absolute; background:#333; color:white; padding:8px; border-radius:4px; font-size:12px; z-index:2000;">
@@ -54,6 +126,11 @@
             <input type="file" id="modalBgImage" accept="image/*">
         </label>
         <label>Background Image URL: <input type="text" id="modalBgImageUrl" placeholder="https://..." /></label>
+        <label for="modalTags">Tags:</label>
+        <input id="modalTags" placeholder="e.g. activity, event" />
+
+
+
 
         <label>Text Color: <input type="color" id="modalTextColor" value="#ffffff" onchange="updatePreview()" /></label>
         <div id="colorPreview">Preview</div>

@@ -98,3 +98,120 @@ button {
 .fc-direction-ltr .fc-timegrid-col-events {
     margin: 0;
 }
+
+#dashboardView {
+    /* display: flex; */
+    /* max-width: 500px; */
+    /* width: 100vw; */
+    height: 500px;
+    margin: 0 auto;
+    /* position: absolute; */
+    /* left: 0; */
+}
+
+#activityPieChart {
+    width: 100% !important;
+    max-width: 500px;
+    height: auto !important;
+}
+
+.charts {
+    display: flex;
+    height: 500px;
+    gap: 2.5vw;
+
+    /* ... */
+}
+
+.time-progress-container {
+    max-width: 600px;
+    margin: auto;
+    font-family: sans-serif;
+}
+
+.time-progress-main {
+    display: flex;
+    height: 24px;
+    background-color: #ddd;
+    margin-bottom: 6px;
+}
+
+.time-progress-spent,
+.time-progress-remaining {
+    height: 100%;
+    transition: width 0.8s ease-in-out;
+}
+
+.time-progress-spent {
+    background-color: #6cbf6c;
+}
+
+.time-progress-remaining {
+    background-color: #bbb;
+}
+
+.time-sub-progress {
+    display: flex;
+    gap: 0;
+}
+
+#subSpent,
+#subRemaining {
+    display: flex;
+    justify-content: center;
+    transition: width 0.8s ease-in-out;
+}
+
+.awake-asleep-track {
+    display: flex;
+    width: 100%;
+    height: 8px;
+    border-radius: 0;
+    /* overflow: hidden; */
+}
+
+.awake-bar,
+.asleep-bar {
+    height: 100%;
+    transition: width 0.8s ease-in-out;
+    /* position: relative; */
+    z-index: 1;
+}
+
+.awake-bar {
+    background-color: #4fc3f7;
+}
+
+.asleep-bar {
+    background-color: #90a4ae;
+}
+
+.custom-tooltip {
+    position: absolute;
+    transform: translateX(-50%);
+    background: #333;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    max-width: 280px;
+    line-height: 1.4;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: normal;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    display: none;
+}
+
+.awake-bar,
+.asleep-bar {
+    min-width: 2px;
+    /* Ensure hover area exists */
+    content: "";
+}
+
+
+.awake-bar:hover,
+.asleep-bar:hover {
+    /* background-color: #ff0 !important; */
+}

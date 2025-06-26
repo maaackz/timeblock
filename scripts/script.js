@@ -1,5 +1,21 @@
+let tagify;
+let pieChart, lifetimeChart, timeProgressChart;
+
+
 document.addEventListener('DOMContentLoaded', function () {
     const calendarEl = document.getElementById('calendar');
+    const tagInput = document.getElementById("modalTags");
+    if (tagInput) {
+        tagify = new Tagify(tagInput);
+        // tagify.removeAllTags();
+
+    }
+
+    const dashboardTagInput = document.getElementById("dashboardTagFilter");
+    const dashboardTagify = new Tagify(dashboardTagInput);
+    dashboardTagify.on('change', updateDashboardChart); // update chart when tags change
+
+
     let selectedEvent = null;
     let selectedInfo = null;
 
@@ -40,6 +56,63 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('calendarEvents', JSON.stringify(sanitized));
 
     }
+    function getLifeEvents() {
+        const settings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+        const events = [];
+
+        if (settings.birthDate) {
+            const birth = new Date(settings.birthDate);
+            const birthEnd = new Date(birth);
+            birthEnd.setHours(23, 59);
+
+            events.push({
+                id: '__life_birth',
+                title: '🎂 Birthday',
+                start: birth.toISOString(),
+                end: birthEnd.toISOString(),
+                allDay: false,
+                display: 'background',
+                backgroundColor: '#ffe699',
+                textColor: '#000',
+                editable: false,
+                tags: ['start'],
+                extendedProps: {
+                    tags: ['start'],
+                    group: '__life',
+                    bgImage: null
+                }
+            });
+        }
+
+        if (settings.deathDate) {
+            const death = new Date(settings.deathDate);
+            const deathEnd = new Date(death);
+            deathEnd.setHours(23, 59);
+
+            events.push({
+                id: '__life_death',
+                title: '💀 Estimated Death',
+                start: death.toISOString(),
+                end: deathEnd.toISOString(),
+                allDay: false,
+                display: 'background',
+                backgroundColor: '#ffb3b3',
+                textColor: '#000',
+                editable: false,
+                tags: ['end'],
+                extendedProps: {
+                    tags: ['end'],
+                    group: '__life',
+                    bgImage: null
+                }
+            });
+        }
+
+        return events;
+    }
+
+
+
     function expandRecurring(events, viewStart, viewEnd) {
         const groupedEvents = {};
         const result = [];
@@ -90,7 +163,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                     endTime: ev.endTime,
                                     startRecur: ev.startRecur || null,
                                     endRecur: ev.endRecur || null,
-                                    exceptionDates: ev.exceptionDates || []
+                                    exceptionDates: ev.exceptionDates || [],
+                                    tags: ev.tags || []
                                 }
                             });
                         }
@@ -106,7 +180,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         allDay: false,
                         extendedProps: {
                             bgImage: ev.bgImage || null,
-                            group: ev.group
+                            group: ev.group,
+                            tags: ev.tags || [] // ✅ ADD HERE TOO
                         }
                     });
                 }
@@ -119,6 +194,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
     const calendar = new FullCalendar.Calendar(calendarEl, {
+        plugins: [],
         initialView: 'timeGridWeek',
         slotDuration: '00:30:00',
         snapDuration: '00:05:00',
@@ -138,13 +214,21 @@ document.addEventListener('DOMContentLoaded', function () {
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'timeGridWeek,timeGridDay'
+            right: 'multiMonthYear,dayGridMonth,timeGridWeek,timeGridDay'
+        },
+        views: {
+            multiMonthYear: {
+                type: 'multiMonth',
+                duration: { years: 1 }
+            }
         },
         events: function (info, successCallback, failureCallback) {
             const stored = ensureUID(getStoredEvents());
             const renderedEvents = expandRecurring(stored, info.start, info.end);
-            successCallback(renderedEvents);
+            const lifeEvents = getLifeEvents(); // ✅ inject dynamically
+            successCallback([...renderedEvents, ...lifeEvents]);
         },
+
 
 
         select(info) {
@@ -166,6 +250,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const startTime = eventProps.startTime || selectedEvent.startStr.slice(11, 16);
             const endTime = eventProps.endTime || selectedEvent.endStr.slice(11, 16);
             const bgImage = eventProps.bgImage || '';
+            const tags = eventProps.tags || []
 
             openModal(
                 selectedEvent.title,
@@ -174,7 +259,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 days,
                 selectedEvent.backgroundColor,
                 selectedEvent.textColor,
-                bgImage
+                bgImage,
+                tags
             );
         },
 
@@ -193,64 +279,104 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             el.addEventListener('mouseenter', () => {
-                // if (!isAltPressed) return;
-
                 const tooltip = document.getElementById('eventTooltip');
                 if (!tooltip) return;
 
-                const viewStart = calendar.view.activeStart;
-                const viewEnd = calendar.view.activeEnd;
+                const viewDate = calendar.getDate(); // current focus
+                const weekStart = new Date(viewDate);
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+                weekStart.setHours(0, 0, 0, 0);
 
-                const allEvents = getStoredEvents().filter(e => {
-                    if (e.title !== info.event.title) return false;
+                const weekEnd = new Date(weekStart);
+                weekEnd.setDate(weekEnd.getDate() + 7);
 
-                    if (e.startRecur || e.endRecur) {
-                        const recurStart = e.startRecur ? new Date(e.startRecur) : null;
-                        const recurEnd = e.endRecur ? new Date(e.endRecur) : null;
+                const monthStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+                const monthEnd = new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1);
 
-                        if (recurStart && viewEnd < recurStart) return false;
-                        if (recurEnd && viewStart > recurEnd) return false;
+                const yearStart = new Date(viewDate.getFullYear(), 0, 1);
+                const yearEnd = new Date(viewDate.getFullYear() + 1, 0, 1);
+
+                const allEvents = getStoredEvents().filter(e => e.title === info.event.title);
+
+                const sumMinsInRange = (startRange, endRange) => {
+                    let sum = 0;
+                    for (const e of allEvents) {
+                        if (e.daysOfWeek && e.startTime && e.endTime && e.startRecur) {
+                            const recurStart = new Date(e.startRecur);
+                            const recurEnd = e.endRecur ? new Date(e.endRecur) : new Date('9999-12-31');
+
+                            const effectiveStart = new Date(Math.max(recurStart, startRange));
+                            const effectiveEnd = new Date(Math.min(recurEnd, endRange));
+
+                            const days = Math.ceil((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24));
+                            if (days <= 0) continue;
+
+                            const [sh, sm] = e.startTime.split(':').map(Number);
+                            const [eh, em] = e.endTime.split(':').map(Number);
+                            let perDay = (eh * 60 + em) - (sh * 60 + sm);
+                            if (perDay < 0) perDay += 1440;
+
+                            for (let d = new Date(effectiveStart); d < effectiveEnd; d.setDate(d.getDate() + 1)) {
+                                if (e.daysOfWeek.includes(d.getDay().toString())) {
+                                    sum += perDay;
+                                }
+                            }
+                        } else if (e.start && e.end) {
+                            const eventStart = new Date(e.start);
+                            const eventEnd = new Date(e.end);
+
+                            if (eventStart >= endRange || eventEnd <= startRange) continue;
+
+                            const overlapStart = new Date(Math.max(eventStart, startRange));
+                            const overlapEnd = new Date(Math.min(eventEnd, endRange));
+
+                            sum += (overlapEnd - overlapStart) / (1000 * 60);
+                        }
                     }
+                    return sum;
+                };
 
-                    return true;
-                });
+                const minsInWeek = sumMinsInRange(weekStart, weekEnd);
+                const minsInMonth = sumMinsInRange(monthStart, monthEnd);
+                const minsInYear = sumMinsInRange(yearStart, yearEnd);
 
-                let totalMins = 0;
+                const formatDuration = mins => `${Math.floor(mins / 60)}h ${Math.round(mins % 60)}m`;
 
-                allEvents.forEach(e => {
-                    if (e.daysOfWeek && e.startTime && e.endTime) {
-                        const [sh, sm] = e.startTime.split(':').map(Number);
-                        const [eh, em] = e.endTime.split(':').map(Number);
-                        let duration = (eh * 60 + em) - (sh * 60 + sm);
-                        if (duration < 0) duration += 1440; // cross-midnight handling
-                        totalMins += duration;
-                    } else if (e.start && e.end) {
-                        const start = new Date(e.start);
-                        const end = new Date(e.end);
-                        totalMins += (end - start) / (1000 * 60);
-                    }
-                });
+                const totalWeekMins = 24 * 60 * 7;
+                const totalMonthMins = 24 * 60 * ((monthEnd - monthStart) / (1000 * 60 * 60 * 24));
+                const totalYearMins = 24 * 60 * ((yearEnd - yearStart) / (1000 * 60 * 60 * 24));
+
+                const totalAwakeWeek = 16 * 60 * 7;
+                const totalAwakeMonth = 16 * 60 * ((monthEnd - monthStart) / (1000 * 60 * 60 * 24));
+                const totalAwakeYear = 16 * 60 * ((yearEnd - yearStart) / (1000 * 60 * 60 * 24));
+
+                const percent = (part, whole) => ((part / whole) * 100).toFixed(2);
 
                 const thisStart = info.event.start;
                 const thisEnd = info.event.end;
                 const thisDurationMins = (thisEnd - thisStart) / (1000 * 60);
-                const thisDurationHrs = thisDurationMins / 60;
-
-                const totalAwakeMins = 16 * 60 * 7;
-                const totalWeekMins = 24 * 60 * 7;
-
-                const percentAwake = ((totalMins / totalAwakeMins) * 100).toFixed(2);
-                const percentTotal = ((totalMins / totalWeekMins) * 100).toFixed(2);
 
                 tooltip.innerHTML = `
-      <strong>${info.event.title}</strong><br>
-      This: ${Math.floor(thisDurationHrs)}h ${Math.round(thisDurationMins % 60)}m<br>
-      Total: ${Math.floor(totalMins / 60)}h ${Math.round(totalMins % 60)}m<br>
-      ${percentAwake}% of weekly awake time<br>
-      ${percentTotal}% of total week
+<strong>${info.event.title}</strong><br>
+This: ${formatDuration(thisDurationMins)}<br><br>
+<b>Weekly:</b><br>
+Total: ${formatDuration(minsInWeek)}<br>
+${percent(minsInWeek, totalAwakeWeek)}% of awake time<br>
+${percent(minsInWeek, totalWeekMins)}% of total week<br><br>
+
+<b>Monthly:</b><br>
+Total: ${formatDuration(minsInMonth)}<br>
+${percent(minsInMonth, totalAwakeMonth)}% of awake time<br>
+${percent(minsInMonth, totalMonthMins)}% of total month<br><br>
+
+<b>Yearly:</b><br>
+Total: ${formatDuration(minsInYear)}<br>
+${percent(minsInYear, totalAwakeYear)}% of awake time<br>
+${percent(minsInYear, totalYearMins)}% of total year
     `;
                 tooltip.style.display = 'block';
             });
+
 
             el.addEventListener('mouseleave', () => {
                 const tooltip = document.getElementById('eventTooltip');
@@ -341,6 +467,7 @@ document.addEventListener('DOMContentLoaded', function () {
             .split('\n')
             .map(s => s.trim())
             .filter(Boolean);
+        const tags = tagify ? tagify.value.map(tag => tag.value) : [];
 
 
         let stored = getStoredEvents();
@@ -364,7 +491,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 allDay: false,
                 color,
                 textColor,
-                bgImage: imageData
+                bgImage: imageData,
+                tags: tags
 
             });
         } else if (days.length > 0) {
@@ -381,6 +509,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         color,
                         textColor,
                         bgImage: imageData,
+                        tags: tags,
                         allDay: false,
                         ...(startRecur ? { startRecur } : {}),
                         ...(endRecur ? { endRecur } : {})
@@ -397,6 +526,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         color,
                         textColor,
                         bgImage: imageData,
+                        tags: tags,
                         allDay: false,
                         ...(startRecur ? { startRecur } : {}),
                         ...(endRecur ? { endRecur } : {})
@@ -413,6 +543,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         color,
                         textColor,
                         bgImage: imageData,
+                        tags: tags,
                         allDay: false,
                         ...(startRecur ? { startRecur } : {}),
                         ...(endRecur ? { endRecur } : {})
@@ -429,6 +560,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 color,
                 textColor,
                 bgImage: imageData,
+                tags: tags,
                 allDay: false
             });
         }
@@ -462,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const endRecur = eventProps.endRecur || null;
         const bgImage = eventProps.bgImage || null;
         const exceptionDates = eventProps.exceptionDates || [];
-
+        const tags = eventProps.tags || []
 
         const newGroup = generateUID();
         const newEvents = [];
@@ -474,21 +606,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         uid: generateUID(), group: newGroup, title: selectedEvent.title,
                         daysOfWeek: [dow], startTime, endTime: '23:59',
                         color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
-                        bgImage, startRecur, endRecur, exceptionDates
+                        bgImage, tags: tags, startRecur, endRecur, exceptionDates
                     });
                     const nextDay = (parseInt(dow) + 1) % 7;
                     newEvents.push({
                         uid: generateUID(), group: newGroup, title: selectedEvent.title,
                         daysOfWeek: [nextDay.toString()], startTime: '00:00', endTime,
                         color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
-                        bgImage, startRecur, endRecur, exceptionDates
+                        bgImage, tags: tags, startRecur, endRecur, exceptionDates
                     });
                 } else {
                     newEvents.push({
                         uid: generateUID(), group: newGroup, title: selectedEvent.title,
                         daysOfWeek: [dow], startTime, endTime,
                         color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
-                        bgImage, startRecur, endRecur, exceptionDates
+                        bgImage, tags: tags, startRecur, endRecur, exceptionDates
                     });
                 }
             });
@@ -497,7 +629,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 uid: generateUID(), title: selectedEvent.title,
                 start: selectedEvent.startStr, end: selectedEvent.endStr,
                 color: selectedEvent.backgroundColor, textColor: selectedEvent.textColor,
-                bgImage, exceptionDates
+                bgImage, tags: tags, exceptionDates
             });
         }
 
@@ -514,7 +646,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalBackdrop').style.display = 'none';
     }
 
-    function openModal(title, startTime, endTime, days, color, textColor, bgImage = '') {
+    function openModal(title, startTime, endTime, days, color, textColor, bgImage = '', tags = []) {
         document.getElementById('modalTitle').value = title;
         document.getElementById('modalStartTime').value = startTime;
         document.getElementById('modalEndTime').value = endTime;
@@ -534,6 +666,13 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalExceptions').value =
             (selectedEvent?.extendedProps?.exceptionDates || []).join('\n');
 
+        // ✅ Restore previously saved tags
+        const existingTags = selectedEvent?.extendedProps?.tags || tags || [];
+        if (tagify) {
+            tagify.removeAllTags();
+            tagify.addTags(existingTags);
+        }
+
         updatePreview();
 
         document.getElementById('eventModal').style.display = 'block';
@@ -541,6 +680,7 @@ document.addEventListener('DOMContentLoaded', function () {
         document.getElementById('modalBgImage').value = '';
         document.getElementById('modalBgImageUrl').value = bgImage || '';
     }
+
 
     function updatePreview() {
         const bg = document.getElementById('modalColor').value;
@@ -615,4 +755,466 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('duplicateBtn').addEventListener('click', duplicateModalEvent);
     document.getElementById('deleteBtn').addEventListener('click', deleteModalEvent);
     document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
+    let dashboardVisible = false;
+
+    const toggleBtn = document.getElementById('toggleDashboardBtn');
+    const dashboardView = document.getElementById('dashboardView');
+    let pieChart; // Chart.js instance
+
+    // toggleBtn.addEventListener('click', () => {
+    //     dashboardVisible = !dashboardVisible;
+    //     dashboardView.style.display = dashboardVisible ? 'block' : 'none';
+
+    //     if (dashboardVisible) renderDashboard();
+    // });
+
+    document.getElementById('toggleDashboardBtn').addEventListener('click', () => {
+        const view = document.getElementById('dashboardView');
+        view.style.display = view.style.display === 'none' ? 'block' : 'none';
+
+        updateDashboardChart();
+        estimateLifetimeUsageChart();
+        renderCustomTimeProgressBar(); // <-- new progress bar chart
+    });
+
+
+    // function renderDashboard() {
+    //     const events = calendar.getEvents(); // FullCalendar instance must be initialized already
+    //     const totals = {};
+
+    //     events.forEach(event => {
+    //         const title = event.title || "Untitled";
+    //         const start = event.start;
+    //         const end = event.end;
+
+    //         if (start && end) {
+    //             const durationHours = (end - start) / 1000 / 60 / 60;
+    //             if (!totals[title]) totals[title] = 0;
+    //             totals[title] += durationHours;
+    //         }
+    //     });
+
+    //     const labels = Object.keys(totals);
+    //     const data = Object.values(totals);
+
+    //     // Destroy existing chart to avoid duplicates
+    //     if (pieChart) pieChart.destroy();
+
+    //     const ctx = document.getElementById('activityPieChart').getContext('2d');
+    //     pieChart = new Chart(ctx, {
+    //         type: 'pie',
+    //         data: {
+    //             labels,
+    //             datasets: [{
+    //                 label: 'Total Time Spent (hrs)',
+    //                 data,
+    //                 backgroundColor: labels.map((_, i) =>
+    //                     `hsl(${(i * 360 / labels.length)}, 70%, 60%)`
+    //                 )
+    //             }]
+    //         },
+    //         options: {
+    //             plugins: {
+    //                 legend: { position: 'right' }
+    //             }
+    //         }
+    //     });
+    // }
+
+    function updateDashboardChart() {
+
+        const storedEvents = getStoredEvents();
+        const selectedTags = dashboardTagify.value.map(tag => tag.value);
+
+        const filteredEvents = storedEvents.filter(ev => {
+            if (selectedTags.length === 0) return true;
+            if (!Array.isArray(ev.tags)) return false;
+            return selectedTags.every(tag => ev.tags.includes(tag));
+        });
+
+        const titleDurations = {};
+        filteredEvents.forEach(ev => {
+            let duration = 0;
+
+            if (ev.startTime && ev.endTime) {
+                const [sh, sm] = ev.startTime.split(':').map(Number);
+                const [eh, em] = ev.endTime.split(':').map(Number);
+                duration = (eh * 60 + em) - (sh * 60 + sm);
+                if (duration < 0) duration += 1440;
+            } else if (ev.start && ev.end) {
+                duration = (new Date(ev.end) - new Date(ev.start)) / (1000 * 60);
+            }
+
+            titleDurations[ev.title] = (titleDurations[ev.title] || 0) + duration;
+        });
+
+        const labels = Object.keys(titleDurations);
+        const data = labels.map(title => titleDurations[title]);
+        const total = data.reduce((a, b) => a + b, 0);
+
+        if (window.pieChart) window.pieChart.destroy();
+
+        const ctx = document.getElementById('activityPieChart').getContext('2d');
+        window.pieChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    data: data,
+                    backgroundColor: labels.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`)
+                }]
+            },
+            options: {
+                plugins: {
+                    datalabels: {
+                        color: '#fff',
+                        formatter: (value, context) => {
+                            const percent = ((value / total) * 100).toFixed(1);
+                            return `${percent}%`;
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function (ctx) {
+                                const label = ctx.label || '';
+                                const value = ctx.parsed;
+                                const percent = ((value / total) * 100).toFixed(1);
+                                return `${label}: ${Math.round(value)} mins (${percent}%)`;
+                            }
+                        }
+                    },
+                    legend: {
+                        labels: {
+                            color: '#000'
+                        }
+                    }
+                }
+            },
+            plugins: [ChartDataLabels]
+        });
+
+        estimateLifetimeUsageChart();
+    }
+    // Toggle settings panel
+    document.getElementById('openSettingsBtn').addEventListener('click', () => {
+        const panel = document.getElementById('settingsPanel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+
+        // Load stored values
+        const stored = JSON.parse(localStorage.getItem('userSettings') || '{}');
+        if (stored.birthDate) document.getElementById('birthDate').value = stored.birthDate;
+        if (stored.lifespanYears) document.getElementById('lifespanYears').value = stored.lifespanYears;
+        if (stored.deathDate) document.getElementById('deathDate').value = stored.deathDate;
+    });
+
+    // Auto-calculate death date from birth + lifespan
+    function updateDeathDate() {
+        const birthInput = document.getElementById('birthDate');
+        const lifespanInput = document.getElementById('lifespanYears');
+        const deathInput = document.getElementById('deathDate');
+
+        const birth = new Date(birthInput.value);
+        const lifespan = parseFloat(lifespanInput.value);
+
+        if (!isNaN(birth.getTime()) && lifespan > 0) {
+            const death = new Date(birth);
+            const fullYears = Math.floor(lifespan);
+            const extraDays = (lifespan - fullYears) * 365.25;
+
+            death.setFullYear(death.getFullYear() + fullYears);
+            death.setDate(death.getDate() + Math.round(extraDays));
+
+            // Format to datetime-local string
+            const localDate = death.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+            deathInput.value = localDate;
+        }
+    }
+
+    // Hook listeners
+    document.getElementById('birthDate').addEventListener('input', updateDeathDate);
+    document.getElementById('lifespanYears').addEventListener('input', updateDeathDate);
+
+    // Save settings
+    document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+        const birthDate = document.getElementById('birthDate').value;
+        const lifespanYears = parseFloat(document.getElementById('lifespanYears').value || '0');
+        const deathDate = document.getElementById('deathDate').value;
+
+        localStorage.setItem('userSettings', JSON.stringify({
+            birthDate,
+            lifespanYears,
+            deathDate
+        }));
+
+        alert('Settings saved!');
+    });
+
+
+    function calculateTagTotals(events, rangeStart, rangeEnd) {
+        const tagTotals = {};
+
+        const getDurationMins = (start, end) => (end - start) / (1000 * 60);
+
+        for (const e of events) {
+            const tags = (e.tags || '').split(',').map(t => t.trim()).filter(Boolean);
+            if (tags.length === 0) continue;
+
+            if (e.daysOfWeek && e.startTime && e.endTime && e.startRecur) {
+                const recurStart = new Date(e.startRecur);
+                const recurEnd = e.endRecur ? new Date(e.endRecur) : new Date('9999-12-31');
+
+                const effectiveStart = new Date(Math.max(recurStart, rangeStart));
+                const effectiveEnd = new Date(Math.min(recurEnd, rangeEnd));
+                const days = Math.ceil((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24));
+                if (days <= 0) continue;
+
+                const [sh, sm] = e.startTime.split(':').map(Number);
+                const [eh, em] = e.endTime.split(':').map(Number);
+                let perDay = (eh * 60 + em) - (sh * 60 + sm);
+                if (perDay < 0) perDay += 1440;
+
+                for (let d = new Date(effectiveStart); d < effectiveEnd; d.setDate(d.getDate() + 1)) {
+                    if (e.daysOfWeek.includes(d.getDay().toString())) {
+                        for (const tag of tags) {
+                            tagTotals[tag] = (tagTotals[tag] || 0) + perDay;
+                        }
+                    }
+                }
+
+            } else if (e.start && e.end) {
+                const start = new Date(e.start);
+                const end = new Date(e.end);
+                if (start >= rangeEnd || end <= rangeStart) continue;
+
+                const overlapStart = new Date(Math.max(start, rangeStart));
+                const overlapEnd = new Date(Math.min(end, rangeEnd));
+                const duration = getDurationMins(overlapStart, overlapEnd);
+
+                for (const tag of tags) {
+                    tagTotals[tag] = (tagTotals[tag] || 0) + duration;
+                }
+            }
+        }
+
+        return tagTotals;
+    }
+
+
+    function getUserSettings() {
+        return JSON.parse(localStorage.getItem('userSettings') || '{}');
+    }
+
+    function estimateLifetimeUsageChart() {
+        const events = getStoredEvents();
+        const settings = getUserSettings();
+        const birth = new Date(settings.birthDate);
+        const death = new Date(settings.deathDate);
+        const now = new Date();
+
+        if (!birth || !death || isNaN(birth.getTime()) || isNaN(death.getTime())) {
+            console.warn("Birth or death date invalid");
+            return;
+        }
+
+        const totalLifeMins = (death - birth) / (1000 * 60);
+        const awakeLifeMins = totalLifeMins * (16 / 24);
+        const lifeElapsedMins = (now - birth) / (1000 * 60);
+
+        // --- Calculate total minutes spent so far from events ---
+        let totalUsedMins = 0;
+        events.forEach(e => {
+            if (e.startTime && e.endTime && e.daysOfWeek && e.startRecur) {
+                const recurStart = new Date(e.startRecur);
+                const recurEnd = e.endRecur ? new Date(e.endRecur) : now;
+                const [sh, sm] = e.startTime.split(':').map(Number);
+                const [eh, em] = e.endTime.split(':').map(Number);
+                let perDay = (eh * 60 + em) - (sh * 60 + sm);
+                if (perDay < 0) perDay += 1440;
+
+                for (let d = new Date(recurStart); d <= recurEnd; d.setDate(d.getDate() + 1)) {
+                    if (d > now) break;
+                    if (e.daysOfWeek.includes(d.getDay().toString())) {
+                        totalUsedMins += perDay;
+                    }
+                }
+            } else if (e.start && e.end) {
+                const start = new Date(e.start);
+                const end = new Date(e.end);
+                if (end > now) return;
+                totalUsedMins += (end - start) / (1000 * 60);
+            }
+        });
+
+        // --- Estimate future usage ---
+        const daysLived = (now - birth) / (1000 * 60 * 60 * 24);
+        const avgPerDayMins = totalUsedMins / daysLived;
+        const estimatedRemainingUsageMins = avgPerDayMins * ((death - now) / (1000 * 60 * 60 * 24));
+
+        const estimatedTotalUsageMins = totalUsedMins + estimatedRemainingUsageMins;
+
+        const ctx = document.getElementById('lifetimeChart').getContext('2d');
+        if (window.lifeChart) window.lifeChart.destroy();
+
+        window.lifeChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Used', 'Estimated Total Use', 'Awake Life'],
+                datasets: [{
+                    label: 'Time over Lifespan',
+                    data: [totalUsedMins, estimatedTotalUsageMins, awakeLifeMins],
+                    backgroundColor: ['#f66', '#fc3', '#6cf']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const val = ctx.parsed.y;
+                                const label = ctx.chart.data.labels[ctx.dataIndex];
+                                return `${label}:\n${formatTimeUnits(val)}`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'Minutes'
+                        },
+                        beginAtZero: true,
+                        max: totalLifeMins
+                    }
+                }
+            }
+        });
+    }
+
+
+    function formatTimeUnits(minutes) {
+        const mins = minutes;
+        const hrs = minutes / 60;
+        const days = hrs / 24;
+        const weeks = days / 7;
+        const months = days / 30.4375; // average month
+        const years = days / 365.25;
+
+        return `
+${mins.toFixed(0)} mins
+${hrs.toFixed(1)} hrs
+${days.toFixed(1)} days
+${weeks.toFixed(1)} wks
+${months.toFixed(1)} mos
+${years.toFixed(2)} yrs
+`.trim();
+    }
+
+    function renderCustomTimeProgressBar() {
+        const settings = getUserSettings();
+        const birth = new Date(settings.birthDate);
+        const death = new Date(settings.deathDate);
+        const now = new Date();
+
+        if (!birth || !death || isNaN(birth.getTime()) || isNaN(death.getTime())) return;
+
+        const totalMins = (death - birth) / (1000 * 60);
+        const passedMins = (now - birth) / (1000 * 60);
+        const remainingMins = totalMins - passedMins;
+
+        const awakePassed = passedMins * (16 / 24);
+        const asleepPassed = passedMins * (8 / 24);
+        const awakeRemaining = remainingMins * (16 / 24);
+        const asleepRemaining = remainingMins * (8 / 24);
+
+        const spentPercent = (passedMins / totalMins) * 100;
+        const remainingPercent = 100 - spentPercent;
+
+        // Main bar
+        document.getElementById('mainSpent').style.width = `${spentPercent}%`;
+        document.getElementById('mainRemaining').style.width = `${remainingPercent}%`;
+
+        // Awake/asleep bars
+        const awakeSpentPercent = (awakePassed / passedMins) * 100;
+        const asleepSpentPercent = 100 - awakeSpentPercent;
+        const awakeRemainingPercent = (awakeRemaining / remainingMins) * 100;
+        const asleepRemainingPercent = 100 - awakeRemainingPercent;
+
+
+        // Set width of sub containers first
+        document.getElementById('subSpent').style.width = `${spentPercent}%`;
+        document.getElementById('subRemaining').style.width = `${remainingPercent}%`;
+
+        // Then set inner awake/asleep bar widths RELATIVE TO THEIR OWN PARENT WIDTH
+        document.getElementById('awakeSpent').style.width = `${awakeSpentPercent}%`;
+        document.getElementById('asleepSpent').style.width = `${asleepSpentPercent}%`;
+        document.getElementById('awakeRemaining').style.width = `${awakeRemainingPercent}%`;
+        document.getElementById('asleepRemaining').style.width = `${asleepRemainingPercent}%`;
+
+        // Create tooltip div once
+        let floatingTooltip = document.querySelector('.custom-tooltip');
+        if (!floatingTooltip) {
+            floatingTooltip = document.createElement('div');
+            floatingTooltip.className = 'custom-tooltip';
+            document.body.appendChild(floatingTooltip);
+        }
+
+        // Tooltip content (optional, for better granularity)
+        const format = (val) =>
+            formatTimeUnits(val)
+                .split('\n')
+                .map(line => {
+                    // Extract number at the start and format it
+                    return line.replace(/^([\d,.]+)/, (_, num) =>
+                        Number(num.replace(/,/g, '')).toLocaleString()
+                    );
+                })
+                .join('<br>');
+
+
+        const setTooltip = (id, label, val) => {
+            const el = document.getElementById(id);
+            if (!el) return;
+
+            const html = `<strong>${label}</strong><br>${format(val)}`;
+
+
+            el.addEventListener('mouseenter', e => {
+                floatingTooltip.innerHTML = html;
+                floatingTooltip.style.display = 'block';
+
+                const rect = el.getBoundingClientRect();
+                floatingTooltip.style.left = `${rect.left + rect.width / 2}px`;
+                floatingTooltip.style.top = `${rect.top - 40}px`;
+            });
+
+            el.addEventListener('mouseleave', () => {
+                floatingTooltip.style.display = 'none';
+            });
+        };
+
+
+        document.body.addEventListener('mousemove', e => {
+            const tooltip = floatingTooltip;
+            if (tooltip) {
+                tooltip.style.left = `${e.pageX + 15}px`;
+                tooltip.style.top = `${e.pageY + 15}px`;
+            }
+        });
+
+        setTooltip('mainSpent', 'Spent', passedMins);
+        setTooltip('mainRemaining', 'Remaining', remainingMins);
+        setTooltip('awakeSpent', 'Spent (Awake)', awakePassed);
+        setTooltip('asleepSpent', 'Spent (Asleep)', asleepPassed);
+        setTooltip('awakeRemaining', 'Remaining (Awake)', awakeRemaining);
+        setTooltip('asleepRemaining', 'Remaining (Asleep)', asleepRemaining);
+
+
+
+
+    }
+
+
 });
