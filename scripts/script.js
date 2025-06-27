@@ -255,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 unlinkBtn.style.display = selectedEvent.extendedProps?.daysOfWeek ? 'inline-block' : 'none';
             }
 
+
             openModal(
                 selectedEvent.title,
                 startTime,
@@ -893,6 +894,10 @@ ${percent(minsInYear, totalYearMins)}% of total year
         } else {
             completeSave(urlFallback || null);
         }
+
+        // Clear selection after saving
+        selectedEvent = null;
+        selectedInfo = null;
     }
 
     function completeSave(imageData) {
@@ -1053,10 +1058,21 @@ ${percent(minsInYear, totalYearMins)}% of total year
     function deleteModalEvent() {
         if (selectedEvent) {
             const stored = getStoredEvents();
-            const filtered = stored.filter(ev => ev.group !== selectedEvent.extendedProps?.group);
+            const eventProps = selectedEvent.extendedProps || {};
+
+            // Use different filtering for recurring vs non-recurring events
+            let filtered;
+            if (eventProps.daysOfWeek) {
+                filtered = stored.filter(ev => ev.group !== eventProps.group);
+            } else {
+                filtered = stored.filter(ev => ev.uid !== selectedEvent.id);
+            }
+
             saveEvents(filtered);
             calendar.refetchEvents();
 
+            // Clear the selected event reference after deletion
+            selectedEvent = null;
         }
         closeModal();
     }
