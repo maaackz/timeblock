@@ -246,11 +246,33 @@ button {
 }
 
 #templateSidebar {
-    width: 250px;
+    opacity: 50%;
+    position: fixed;
+    top: 10%;
+    left: 10px; /* optional: anchor to left side */
+    z-index: 99;
+    width: 200px;
     min-height: 100px;
-    border: 2px dashed #ccc;
-    padding: 10px;
-    overflow-y: auto;
+    height: 150px;
+
+    padding: 0px;
+    overflow: auto; /* required for resize to work properly */
+    resize: both;   /* enables bottom-right corner resizing */
+
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    scrollbar-color: lightgray transparent;
+    transition: opacity ease-out 0.35s;
+
+    /* Optional: visual cue for resizability */
+    /* border: 1px solid #ccc; */
+    background: rgba(255, 255, 255, 0.05); /* optional transparent look */
+}
+
+#templateSidebar:hover {
+    opacity: 100%;
 }
 
 /* Add to your CSS */
