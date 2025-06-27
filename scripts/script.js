@@ -112,7 +112,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
 
-
     function expandRecurring(events, viewStart, viewEnd) {
         const groupedEvents = {};
         const result = [];
@@ -125,7 +124,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
         for (const group in groupedEvents) {
             const groupEvents = groupedEvents[group];
-            const exceptionDates = new Set(groupEvents.flatMap(ev => ev.exceptionDates || []).map(d => new Date(d).toDateString()));
+            const exceptionDates = new Set(
+                groupEvents.flatMap(ev => ev.exceptionDates || []).map(d => new Date(d).toDateString())
+            );
 
             groupEvents.forEach(ev => {
                 const daysOfWeek = (ev.daysOfWeek || []).map(Number);
@@ -137,7 +138,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const loopStart = new Date(Math.max(viewStart, recurStart));
                     const loopEnd = new Date(Math.min(viewEnd, recurEnd));
 
-                    for (let d = new Date(loopStart); d <= loopEnd; d.setDate(d.getDate() + 1)) {
+                    for (let d = new Date(loopStart); d <= loopEnd; d = new Date(d.getTime() + 86400000)) {
                         const day = d.getDay();
                         if (daysOfWeek.includes(day) && !exceptionDates.has(d.toDateString())) {
                             const eventDate = new Date(d);
@@ -181,7 +182,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         extendedProps: {
                             bgImage: ev.bgImage || null,
                             group: ev.group,
-                            tags: ev.tags || [] // ✅ ADD HERE TOO
+                            tags: ev.tags || []
                         }
                     });
                 }
@@ -190,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return result;
     }
+
 
 
 
@@ -231,6 +233,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
 
 
+
+
         select(info) {
             selectedInfo = info;
             selectedEvent = null;
@@ -251,6 +255,11 @@ document.addEventListener('DOMContentLoaded', function () {
             const endTime = eventProps.endTime || selectedEvent.endStr.slice(11, 16);
             const bgImage = eventProps.bgImage || '';
             const tags = eventProps.tags || []
+
+            const unlinkBtn = document.getElementById('unlinkBtn');
+            if (unlinkBtn) {
+                unlinkBtn.style.display = selectedEvent.extendedProps?.daysOfWeek ? 'inline-block' : 'none';
+            }
 
             openModal(
                 selectedEvent.title,
@@ -356,9 +365,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 const thisEnd = info.event.end;
                 const thisDurationMins = (thisEnd - thisStart) / (1000 * 60);
 
+                let totalDur = 0;
+                let count = 0;
+
+                for (const e of allEvents) {
+                    if (e.daysOfWeek && e.startTime && e.endTime && e.startRecur) {
+                        const [sh, sm] = e.startTime.split(':').map(Number);
+                        const [eh, em] = e.endTime.split(':').map(Number);
+                        let duration = (eh * 60 + em) - (sh * 60 + sm);
+                        if (duration < 0) duration += 1440;
+
+                        // Estimate how many recurrences happen in a year (only rough for average)
+                        const recurStart = new Date(e.startRecur);
+                        const recurEnd = e.endRecur ? new Date(e.endRecur) : new Date('9999-12-31');
+                        const daysBetween = Math.floor((recurEnd - recurStart) / (1000 * 60 * 60 * 24));
+                        const approxOccurrences = Math.min(365, daysBetween) * e.daysOfWeek.length / 7;
+
+                        totalDur += duration * approxOccurrences;
+                        count += approxOccurrences;
+                    } else if (e.start && e.end) {
+                        const start = new Date(e.start);
+                        const end = new Date(e.end);
+                        const mins = (end - start) / (1000 * 60);
+                        totalDur += mins;
+                        count += 1;
+                    }
+                }
+
+                const avgDuration = count > 0 ? totalDur / count : 0;
+
                 tooltip.innerHTML = `
 <strong>${info.event.title}</strong><br>
-This: ${formatDuration(thisDurationMins)}<br><br>
+This: ${formatDuration(thisDurationMins)}<br>
+Average: ${formatDuration(avgDuration)}<br><br>
 <b>Weekly:</b><br>
 Total: ${formatDuration(minsInWeek)}<br>
 ${percent(minsInWeek, totalAwakeWeek)}% of awake time<br>
@@ -373,7 +412,8 @@ ${percent(minsInMonth, totalMonthMins)}% of total month<br><br>
 Total: ${formatDuration(minsInYear)}<br>
 ${percent(minsInYear, totalAwakeYear)}% of awake time<br>
 ${percent(minsInYear, totalYearMins)}% of total year
-    `;
+`;
+
                 tooltip.style.display = 'block';
             });
 
@@ -753,6 +793,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
     document.getElementById('saveBtn').addEventListener('click', saveModalEvent);
     document.getElementById('duplicateBtn').addEventListener('click', duplicateModalEvent);
+    document.getElementById('unlinkBtn').addEventListener('click', unlinkSingleEvent);
     document.getElementById('deleteBtn').addEventListener('click', deleteModalEvent);
     document.getElementById('cancelBtn').addEventListener('click', closeModal);
 
@@ -1253,4 +1294,144 @@ ${years.toFixed(2)} yrs
     }
 
     renderCustomTimeProgressBar()
+
+    calendar.on('datesSet', () => {
+        document.querySelectorAll('.fc-day').forEach(cell => {
+            cell.style.cursor = 'pointer'; // visual cue
+            cell.addEventListener('click', (e) => {
+                // print("test")
+                const dateStr = cell.getAttribute('data-date');
+                if (dateStr) {
+                    showDayMenu(new Date(dateStr), e.pageX, e.pageY);
+                }
+            });
+        });
+    });
+    function showDayMenu(date, x, y) {
+        const menu = document.getElementById('dayActionMenu');
+        menu.style.left = `${x}px`;
+        menu.style.top = `${y}px`;
+        menu.style.display = 'block';
+        menu.setAttribute('data-date', date.toISOString());
+    }
+
+    // Hide menu on click elsewhere
+    // document.addEventListener('click', (e) => {
+    //     if (!e.target.closest('#dayActionMenu') && document.getElementById('dayActionMenu').style.display !=) {
+    //         document.getElementById('dayActionMenu').style.display = 'none';
+    //     }
+    // });
+
+    document.querySelectorAll('#dayActionMenu .menu-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const action = item.getAttribute('data-action');
+            const menu = document.getElementById('dayActionMenu');
+            const date = new Date(menu.getAttribute('data-date'));
+
+            if (action === 'unlinkAll') {
+                unlinkEventsOnDate(date);
+            }
+
+            menu.style.display = 'none';
+        });
+    });
+
+
+    function unlinkEventsOnDate(targetDate) {
+        const targetDateStr = targetDate.toISOString().split('T')[0];
+        const stored = getStoredEvents();
+        const rendered = calendar.getEvents();
+        const eventsToUnlink = rendered.filter(ev =>
+            ev.start && ev.start.toDateString() === targetDate.toDateString()
+        );
+
+        const newUnlinkedEvents = [];
+
+        // Add skip date to all members of affected groups
+        const groupsToUpdate = new Set(eventsToUnlink.map(ev => ev.extendedProps?.group).filter(Boolean));
+
+        for (const groupId of groupsToUpdate) {
+            for (const ev of stored) {
+                if (ev.group === groupId) {
+                    ev.exceptionDates = ev.exceptionDates || [];
+                    if (!ev.exceptionDates.includes(targetDateStr)) {
+                        ev.exceptionDates.push(targetDateStr);
+                    }
+                }
+            }
+        }
+
+        // Create new unlinked events to be saved
+        for (const original of eventsToUnlink) {
+            const start = original.start.toISOString();
+            const end = original.end?.toISOString();
+
+            newUnlinkedEvents.push({
+                uid: generateUID(),
+                title: original.title,
+                start,
+                end,
+                allDay: original.allDay,
+                color: original.backgroundColor,
+                textColor: original.textColor,
+                bgImage: original.extendedProps?.bgImage || null,
+                tags: original.extendedProps?.tags || [],
+                exceptionDates: [],
+            });
+        }
+
+        saveEvents([...stored, ...newUnlinkedEvents]);
+        calendar.refetchEvents();
+    }
+
+    function unlinkSingleEvent() {
+        if (!selectedEvent || !selectedEvent.start) return;
+
+        const d = selectedEvent.start;
+        const eventDateStr = `${d.getFullYear()}-${(d.getMonth() + 1).toString().padStart(2, '0')}-${d.getDate().toString().padStart(2, '0')}`;
+
+        const stored = getStoredEvents();
+        const groupId = selectedEvent.extendedProps?.group;
+
+        if (groupId) {
+            for (const ev of stored) {
+                if (ev.group === groupId) {
+                    ev.exceptionDates = ev.exceptionDates || [];
+                    if (!ev.exceptionDates.includes(eventDateStr)) {
+                        ev.exceptionDates.push(eventDateStr);
+                    }
+                }
+            }
+        }
+
+        const newEvent = {
+            uid: generateUID(),
+            title: selectedEvent.title,
+            start: selectedEvent.start.toISOString(),
+            end: selectedEvent.end?.toISOString(),
+            allDay: selectedEvent.allDay,
+            color: selectedEvent.backgroundColor,
+            textColor: selectedEvent.textColor,
+            bgImage: selectedEvent.extendedProps?.bgImage || null,
+            tags: selectedEvent.extendedProps?.tags || [],
+            exceptionDates: [],
+        };
+
+        saveEvents([...stored, newEvent]);
+
+        // 💥 Clear and re-add event source to avoid stale reference issues
+        calendar.removeAllEventSources();
+        calendar.addEventSource(function (info, successCallback, failureCallback) {
+            const raw = getStoredEvents();
+            const expanded = expandRecurring(raw, info.start, info.end);
+            successCallback(expanded);
+        });
+
+        calendar.refetchEvents();
+        closeModal();
+    }
+
+
+
+
 });
