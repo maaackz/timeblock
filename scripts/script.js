@@ -291,9 +291,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tooltip = document.getElementById('eventTooltip');
                 if (!tooltip) return;
 
-                const viewDate = calendar.getDate(); // current focus
+                const viewDate = calendar.getDate();
                 const weekStart = new Date(viewDate);
-                weekStart.setDate(weekStart.getDate() - weekStart.getDay()); // Sunday
+                weekStart.setDate(weekStart.getDate() - weekStart.getDay());
                 weekStart.setHours(0, 0, 0, 0);
 
                 const weekEnd = new Date(weekStart);
@@ -361,38 +361,121 @@ document.addEventListener('DOMContentLoaded', function () {
 
                 const percent = (part, whole) => ((part / whole) * 100).toFixed(2);
 
-                const thisStart = info.event.start;
-                const thisEnd = info.event.end;
-                const thisDurationMins = (thisEnd - thisStart) / (1000 * 60);
-
-                let totalDur = 0;
-                let count = 0;
+                const intervals = [];
 
                 for (const e of allEvents) {
                     if (e.daysOfWeek && e.startTime && e.endTime && e.startRecur) {
-                        const [sh, sm] = e.startTime.split(':').map(Number);
-                        const [eh, em] = e.endTime.split(':').map(Number);
-                        let duration = (eh * 60 + em) - (sh * 60 + sm);
-                        if (duration < 0) duration += 1440;
-
-                        // Estimate how many recurrences happen in a year (only rough for average)
                         const recurStart = new Date(e.startRecur);
                         const recurEnd = e.endRecur ? new Date(e.endRecur) : new Date('9999-12-31');
-                        const daysBetween = Math.floor((recurEnd - recurStart) / (1000 * 60 * 60 * 24));
-                        const approxOccurrences = Math.min(365, daysBetween) * e.daysOfWeek.length / 7;
+                        const [sh, sm] = e.startTime.split(':').map(Number);
+                        const [eh, em] = e.endTime.split(':').map(Number);
+                        const perDayDur = ((eh * 60 + em) - (sh * 60 + sm) + 1440) % 1440;
 
-                        totalDur += duration * approxOccurrences;
-                        count += approxOccurrences;
+                        for (
+                            let d = new Date(Math.max(recurStart, yearStart));
+                            d <= Math.min(recurEnd, yearEnd);
+                            d.setDate(d.getDate() + 1)
+                        ) {
+                            const dayOfWeek = d.getDay().toString();
+                            if (!e.daysOfWeek.includes(dayOfWeek)) continue;
+                            const start = new Date(d);
+                            start.setHours(sh, sm, 0, 0);
+                            const end = new Date(start);
+                            end.setMinutes(end.getMinutes() + perDayDur);
+                            intervals.push({ start: start.getTime(), end: end.getTime() });
+                        }
                     } else if (e.start && e.end) {
-                        const start = new Date(e.start);
-                        const end = new Date(e.end);
-                        const mins = (end - start) / (1000 * 60);
-                        totalDur += mins;
-                        count += 1;
+                        const start = new Date(e.start).getTime();
+                        const end = new Date(e.end).getTime();
+                        intervals.push({ start, end });
                     }
                 }
 
+                let blocks = [];
+
+                for (const interval of intervals) {
+                    if (blocks.length === 0) {
+                        blocks.push({ ...interval });
+                    } else {
+                        const last = blocks[blocks.length - 1];
+                        if (interval.start - last.end <= 60 * 1000) {
+                            last.end = Math.max(last.end, interval.end);
+                        } else {
+                            blocks.push({ ...interval });
+                        }
+                    }
+                }
+
+                const totalDur = blocks.reduce((sum, b) => sum + (b.end - b.start) / 60000, 0);
+                const count = blocks.length;
                 const avgDuration = count > 0 ? totalDur / count : 0;
+
+                // 'This' duration: try to expand to include adjacent intervals within 1min
+                // Get ALL stored events with same title
+                const storedTitleEvents = getStoredEvents().filter(e => e.title === info.event.title);
+
+                // const intervals = [];
+
+                for (const e of storedTitleEvents) {
+                    if (e.daysOfWeek && e.startTime && e.endTime && e.startRecur) {
+                        const recurStart = new Date(e.startRecur);
+                        const recurEnd = e.endRecur ? new Date(e.endRecur) : new Date('9999-12-31');
+                        const [sh, sm] = e.startTime.split(':').map(Number);
+                        const [eh, em] = e.endTime.split(':').map(Number);
+                        const perDayDur = ((eh * 60 + em) - (sh * 60 + sm) + 1440) % 1440;
+
+                        for (
+                            let d = new Date(Math.max(recurStart, yearStart));
+                            d <= Math.min(recurEnd, yearEnd);
+                            d.setDate(d.getDate() + 1)
+                        ) {
+                            if (!e.daysOfWeek.includes(d.getDay().toString())) continue;
+
+                            const start = new Date(d);
+                            start.setHours(sh, sm, 0, 0);
+                            const end = new Date(start);
+                            end.setMinutes(end.getMinutes() + perDayDur);
+                            intervals.push({ start: start.getTime(), end: end.getTime() });
+                        }
+                    } else if (e.start && e.end) {
+                        const start = new Date(e.start).getTime();
+                        const end = new Date(e.end).getTime();
+                        intervals.push({ start, end });
+                    }
+                }
+
+                // Sort and merge
+                intervals.sort((a, b) => a.start - b.start);
+
+                const mergedBlocks = [];
+                for (const interval of intervals) {
+                    if (mergedBlocks.length === 0) {
+                        mergedBlocks.push({ ...interval });
+                    } else {
+                        const last = mergedBlocks[mergedBlocks.length - 1];
+                        if (interval.start - last.end <= 60000) {
+                            last.end = Math.max(last.end, interval.end);
+                        } else {
+                            mergedBlocks.push({ ...interval });
+                        }
+                    }
+                }
+
+                // Find which block the hovered event belongs to
+                const hoveredStart = info.event.start.getTime();
+                const hoveredEnd = info.event.end.getTime();
+                let thisDurationMins = (hoveredEnd - hoveredStart) / 60000;
+
+                for (const block of mergedBlocks) {
+                    const overlaps = hoveredStart < block.end && hoveredEnd > block.start;
+                    const touches = Math.abs(hoveredStart - block.end) <= 60000 || Math.abs(hoveredEnd - block.start) <= 60000;
+
+                    if (overlaps || touches) {
+                        thisDurationMins = (block.end - block.start) / 60000;
+                        break;
+                    }
+                }
+
 
                 tooltip.innerHTML = `
 <strong>${info.event.title}</strong><br>
@@ -415,6 +498,11 @@ ${percent(minsInYear, totalYearMins)}% of total year
 `;
 
                 tooltip.style.display = 'block';
+            });
+
+            el.addEventListener('mouseleave', () => {
+                const tooltip = document.getElementById('eventTooltip');
+                if (tooltip) tooltip.style.display = 'none';
             });
 
 
