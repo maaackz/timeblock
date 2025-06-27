@@ -910,6 +910,14 @@ ${percent(minsInYear, totalYearMins)}% of total year
             .filter(Boolean);
         const tags = tagify ? tagify.value.map(tag => tag.value) : [];
 
+        // Helper function to apply time to a date
+        function applyTimeToDate(date, time) {
+            if (!date || !time) return date;
+            const [hours, minutes] = time.split(':').map(Number);
+            const newDate = new Date(date);
+            newDate.setHours(hours, minutes, 0, 0);
+            return newDate;
+        }
 
         let stored = getStoredEvents();
 
@@ -937,18 +945,26 @@ ${percent(minsInYear, totalYearMins)}% of total year
         const newEvents = [];
 
         if (selectedInfo && days.length === 0) {
+            // For new events - apply time to selection date
+            const start = applyTimeToDate(selectedInfo.start, startTime);
+            const end = applyTimeToDate(selectedInfo.start, endTime);
+
+            // Handle cross-midnight case
+            if (end < start) {
+                end.setDate(end.getDate() + 1);
+            }
+
             newEvents.push({
                 uid: generateUID(),
                 title,
-                start: selectedInfo.startStr,
-                end: selectedInfo.endStr,
+                start: start.toISOString(),
+                end: end.toISOString(),
                 exceptionDates,
                 allDay: false,
                 color,
                 textColor,
                 bgImage: imageData,
                 tags: tags
-
             });
         } else if (days.length > 0) {
             days.forEach(dow => {
@@ -1006,11 +1022,20 @@ ${percent(minsInYear, totalYearMins)}% of total year
                 }
             });
         } else if (selectedEvent) {
+            // For existing non-recurring events - apply time to original date
+            const start = applyTimeToDate(selectedEvent.start, startTime);
+            const end = applyTimeToDate(selectedEvent.start, endTime);
+
+            // Handle cross-midnight case
+            if (end < start) {
+                end.setDate(end.getDate() + 1);
+            }
+
             newEvents.push({
                 uid: generateUID(),
                 title,
-                start: selectedEvent.startStr,
-                end: selectedEvent.endStr,
+                start: start.toISOString(),
+                end: end.toISOString(),
                 exceptionDates,
                 color,
                 textColor,
@@ -1023,9 +1048,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
         saveEvents([...stored, ...newEvents]);
         closeModal();
         calendar.refetchEvents();
-
     }
-
 
     function deleteModalEvent() {
         if (selectedEvent) {
