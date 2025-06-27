@@ -31,6 +31,20 @@
         </div>
     </div>
 
+    <div id="templateSidebar">
+        <div class="template-block fc-event fc-h-event fc-daygrid-event fc-daygrid-block-event" data-event='{
+      "title": "Morning Focus",
+      "duration": "01:30",
+      "tags": ["focus"],
+      "bgImage": "img/focus.jpg",
+      "backgroundColor": "#2874A6",
+      "textColor": "#ffffff"
+    }' style="background-color: #2874A6; color: #ffffff;">
+            <div class="fc-event-main">Morning Focus</div>
+            
+        </div>
+    </div>
+
     <main>
         <div id='calendar'></div>
 
@@ -40,7 +54,7 @@
             <div id="customTimeProgress" style="margin-top: 2rem;">
                 <div class="time-progress-container">
                     <!-- Main Lifetime Bar -->
-                     <div class="mini-bar-title">Lifetime</div>
+                    <div class="mini-bar-title">Lifetime</div>
                     <div class="time-progress-main">
                         <div class="time-progress-spent" id="mainSpent"></div>
                         <div class="time-progress-remaining" id="mainRemaining"></div>
@@ -170,9 +184,10 @@
 
 
 
-<div id="dayActionMenu" style="position:absolute; background:white; border:1px solid #ccc; z-index:1000; box-shadow:0 2px 5px rgba(0,0,0,0.2); padding:5px;">
-    <div class="menu-item" data-action="unlinkAll">Unlink All</div>
-</div>
+    <div id="dayActionMenu"
+        style="position:absolute; background:white; border:1px solid #ccc; z-index:1000; box-shadow:0 2px 5px rgba(0,0,0,0.2); padding:5px;">
+        <div class="menu-item" data-action="unlinkAll">Unlink All</div>
+    </div>
 
     <div id="eventTooltip"
         style="display:none; position:absolute; background:#333; color:white; padding:8px; border-radius:4px; font-size:12px; z-index:2000;">
@@ -223,6 +238,8 @@
         <button id="deleteBtn">Delete</button>
         <button id="cancelBtn">Cancel</button>
     </div>
+
+
 
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
     <script src="scripts/script.js"></script>

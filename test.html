@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset='utf-8' />
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet" />
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <div id="templateSidebar">
+    <div class="template-block"
+      data-event='{"title":"Test","duration":"01:00","backgroundColor":"#28a745","textColor":"#fff","tags":[],"bgImage":null}'>
+      Test
+    </div>
+  </div>
+  <div id="calendar"></div>
+
+  <!-- ✅ FullCalendar and Plugins in correct order -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/interaction@6.1.8/index.global.min.js"></script>
+
+  <script>
+    const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+      plugins: ['interaction'], // ✅ correct global plugin
+      editable: true,
+      droppable: true,
+
+      eventAdd(addInfo) {
+        const ev = addInfo.event;
+        if (!ev.extendedProps.isTemplate) return;
+
+        const start = ev.start;
+        const end = new Date(start.getTime() + parseDuration(ev.extendedProps.duration));
+
+        ev.remove();
+
+        calendar.addEvent({
+          title: ev.title,
+          start,
+          end,
+          backgroundColor: ev.backgroundColor,
+          textColor: ev.textColor,
+          extendedProps: { ...ev.extendedProps, isTemplate: false }
+        });
+
+        console.log('✅ Real event added from', start, 'to', end);
+      }
+    });
+
+    calendar.render();
+
+    new FullCalendar.Draggable(document.getElementById('templateSidebar'), {
+      itemSelector: '.template-block',
+      eventData(el) {
+        const raw = JSON.parse(el.dataset.event);
+        return {
+          title: raw.title,
+          duration: raw.duration,
+          backgroundColor: raw.backgroundColor,
+          textColor: raw.textColor,
+          extendedProps: { ...raw, isTemplate: true }
+        };
+      }
+    });
+
+    function parseDuration(str) {
+      const [h, m] = str.split(':').map(Number);
+      return ((h || 0) * 60 + (m || 0)) * 60 * 1000;
+    }
+  </script>
+</body>
+</html>

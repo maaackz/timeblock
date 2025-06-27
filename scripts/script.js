@@ -3,6 +3,7 @@ let pieChart, lifetimeChart, timeProgressChart;
 
 
 document.addEventListener('DOMContentLoaded', function () {
+
     const calendarEl = document.getElementById('calendar');
     const tagInput = document.getElementById("modalTags");
     if (tagInput) {
@@ -10,11 +11,9 @@ document.addEventListener('DOMContentLoaded', function () {
         // tagify.removeAllTags();
 
     }
-
     const dashboardTagInput = document.getElementById("dashboardTagFilter");
     const dashboardTagify = new Tagify(dashboardTagInput);
     dashboardTagify.on('change', updateDashboardChart); // update chart when tags change
-
 
     let selectedEvent = null;
     let selectedInfo = null;
@@ -42,7 +41,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }));
     }
 
-
     if (!localStorage.getItem('calendarEvents')) {
         localStorage.setItem('calendarEvents', JSON.stringify(defaultEvents));
     } else {
@@ -56,6 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
         localStorage.setItem('calendarEvents', JSON.stringify(sanitized));
 
     }
+
     function getLifeEvents() {
         const settings = JSON.parse(localStorage.getItem('userSettings') || '{}');
         const events = [];
@@ -110,7 +109,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         return events;
     }
-
 
     function expandRecurring(events, viewStart, viewEnd) {
         const groupedEvents = {};
@@ -192,9 +190,6 @@ document.addEventListener('DOMContentLoaded', function () {
         return result;
     }
 
-
-
-
     const calendar = new FullCalendar.Calendar(calendarEl, {
         plugins: [],
         initialView: 'timeGridWeek',
@@ -202,6 +197,8 @@ document.addEventListener('DOMContentLoaded', function () {
         snapDuration: '00:05:00',
         allDaySlot: false,
         editable: true,
+        droppable: true,  // required
+
         selectable: true,
         nowIndicator: true,
         selectMirror: true,
@@ -227,19 +224,16 @@ document.addEventListener('DOMContentLoaded', function () {
         events: function (info, successCallback, failureCallback) {
             const stored = ensureUID(getStoredEvents());
             const renderedEvents = expandRecurring(stored, info.start, info.end);
-            const lifeEvents = getLifeEvents(); // ✅ inject dynamically
+            const lifeEvents = getLifeEvents();
             successCallback([...renderedEvents, ...lifeEvents]);
         },
-
-
-
-
 
         select(info) {
             selectedInfo = info;
             selectedEvent = null;
             openModal('', info.startStr.slice(11, 16), info.endStr.slice(11, 16), [], '#007bff', '#ffffff', '');
         },
+
 
         eventClick(info) {
             selectedEvent = info.event;
@@ -512,16 +506,258 @@ ${percent(minsInYear, totalYearMins)}% of total year
             });
         },
 
-
-
         eventDrop(info) {
             updateEventGroup(info.event);
         },
 
         eventResize(info) {
             updateEventGroup(info.event);
+        },
+
+
+
+
+
+
+    });
+
+    function parseDuration(str) {
+        const parts = str.split(':').map(Number);
+        if (parts.length === 2) {
+            const [h, m] = parts;
+            return (h * 60 + m) * 60 * 1000;
+        }
+        return null;
+    }
+
+    function setupTemplateDragAndDrop() {
+        const sidebar = document.getElementById('templateSidebar');
+        new FullCalendar.Draggable(sidebar, {
+            itemSelector: '.template-block',
+            eventData: function (el) {
+                const raw = JSON.parse(el.dataset.event);
+                return {
+                    title: raw.title,
+                    duration: raw.duration,
+                    backgroundColor: raw.backgroundColor,
+                    textColor: raw.textColor,
+                    extendedProps: {
+                        tags: raw.tags || [],
+                        bgImage: raw.bgImage || null,
+                        isTemplate: true
+                    }
+                };
+            }
+        });
+    }
+
+    function loadTemplateBlocksFromStorage() {
+        const stored = JSON.parse(localStorage.getItem('templateBlocks') || '[]');
+        const container = document.getElementById('templateSidebar');
+        container.innerHTML = ''; // Clear existing templates
+
+        stored.forEach(data => {
+            const div = document.createElement('div');
+            div.className = 'template-block fc-event';
+            div.setAttribute('data-event', JSON.stringify(data));
+
+            // Create content container
+            const content = document.createElement('div');
+            content.className = 'template-content';
+            content.textContent = data.title;
+            content.style.backgroundColor = data.backgroundColor;
+            content.style.color = data.textColor;
+
+            if (data.bgImage) {
+                content.style.backgroundImage = `url(${data.bgImage})`;
+                content.style.backgroundSize = 'cover';
+                content.style.backgroundBlendMode = 'multiply';
+            }
+
+            // Create delete button (x)
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'template-delete-btn';
+            deleteBtn.innerHTML = '&times;';
+            deleteBtn.title = 'Delete template';
+
+            // Add click handler for deletion
+            deleteBtn.addEventListener('click', function (e) {
+                e.stopPropagation(); // Prevent triggering template drag/edit
+                div.remove();
+                saveTemplateBlocksToStorage();
+            });
+
+            // Add click handler for editing
+            div.addEventListener('click', function (e) {
+                if (e.target !== deleteBtn) {
+                    editTemplateBlock(div);
+                }
+            });
+
+            // Build template structure
+            div.appendChild(content);
+            div.appendChild(deleteBtn);
+            container.appendChild(div);
+        });
+
+        setupTemplateDragAndDrop();
+    }
+    // Remove this conflicting global handler:
+    // calendar.setOption('eventReceive', ...)
+
+    // Replace with this corrected eventReceive handler:
+    calendar.on('eventReceive', function (info) {
+        console.log('eventReceive triggered', info.event.title, info.event.start);
+
+        if (!info.event.extendedProps.isTemplate) return;
+
+        console.log('Processing template drop for:', info.event.title);
+
+        // Capture ghost event details BEFORE reverting
+        const ghostEvent = info.event;
+        const start = ghostEvent.start;
+        const end = ghostEvent.end; // Get the calculated end time
+        const title = ghostEvent.title;
+        const backgroundColor = ghostEvent.backgroundColor;
+        const textColor = ghostEvent.textColor;
+        const extendedProps = ghostEvent.extendedProps;
+
+        // Prevent FullCalendar from creating its own ghost event
+        info.revert();
+
+        // Create persistent event using ghost event's calculated duration
+        const newEvent = {
+            uid: generateUID(),
+            title,
+            start: start.toISOString(),
+            end: end.toISOString(), // Use captured end time
+            color: backgroundColor,
+            textColor,
+            bgImage: extendedProps.bgImage || null,
+            tags: extendedProps.tags || [],
+            allDay: false
+        };
+
+        console.log('Creating persistent event:', newEvent);
+
+        // Add to storage
+        const stored = getStoredEvents();
+        stored.push(newEvent);
+        saveEvents(stored);
+
+        // Refresh calendar
+        console.log('Refetching events');
+        calendar.refetchEvents();
+    });
+
+    loadTemplateBlocksFromStorage()
+
+    let recentlyDraggedToSidebar = false;
+
+    calendar.on('eventDragStop', function (info) {
+        const sidebar = document.getElementById('templateSidebar');
+        const sidebarRect = sidebar.getBoundingClientRect();
+        const { pageX, pageY } = info.jsEvent;
+
+        if (
+            pageX >= sidebarRect.left &&
+            pageX <= sidebarRect.right &&
+            pageY >= sidebarRect.top &&
+            pageY <= sidebarRect.bottom
+        ) {
+            // Convert dragged event to template
+            const templateData = {
+                title: info.event.title,
+                duration: getEventDuration(info.event),
+                tags: info.event.extendedProps?.tags || [],
+                bgImage: info.event.extendedProps?.bgImage || null,
+                backgroundColor: info.event.backgroundColor,
+                textColor: info.event.textColor
+            };
+
+            saveTemplateBlock(templateData);
+            // info.event.remove(); // ❌ remove this line to keep original event
         }
     });
+
+    // Add this at the top of your script
+    let isProcessingTemplate = false;
+
+    // ... existing code above ...
+    // Remove this entire block:
+    // calendar.setOption('eventReceive', function (info) {
+    //   console.log('Global eventReceive handler called');
+    //   return false; // Prevent FullCalendar from creating its own event
+    // });
+
+    // Replace with this modified handler:
+    // Remove this conflicting global handler:
+    // calendar.setOption('eventReceive', ...)
+
+    // Replace with this corrected eventReceive handler:
+
+    // Add this to log all events after refetch
+    calendar.on('eventsSet', function (info) {
+        console.log('Events after refetch:');
+        calendar.getEvents().forEach(event => {
+            console.log(`- ${event.title} (${event.id}) at ${event.start}`);
+        });
+    });
+
+    // ... existing code below ...
+
+    function getEventDuration(event) {
+        const diff = (event.end - event.start) / 60000;
+        const h = Math.floor(diff / 60).toString().padStart(2, '0');
+        const m = Math.round(diff % 60).toString().padStart(2, '0');
+        return `${h}:${m}`;
+    }
+
+    function saveTemplateBlock(data) {
+        const container = document.getElementById('templateSidebar');
+        const div = document.createElement('div');
+        div.className = 'template-block fc-event';
+        div.setAttribute('data-event', JSON.stringify(data));
+
+        const content = document.createElement('div');
+        content.className = 'template-content';
+        content.textContent = data.title;
+        content.style.backgroundColor = data.backgroundColor;
+        content.style.color = data.textColor;
+
+        if (data.bgImage) {
+            content.style.backgroundImage = `url(${data.bgImage})`;
+            content.style.backgroundSize = 'cover';
+            content.style.backgroundBlendMode = 'multiply';
+        }
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'template-delete-btn';
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.title = 'Delete template';
+        deleteBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            div.remove();
+            saveTemplateBlocksToStorage();
+        });
+
+        div.appendChild(content);
+        div.appendChild(deleteBtn);
+        container.appendChild(div);
+
+        saveTemplateBlocksToStorage();
+    }
+
+    function saveTemplateBlocksToStorage() {
+        const templates = [];
+        document.querySelectorAll('#templateSidebar .template-block').forEach(el => {
+            const data = el.getAttribute('data-event');
+            if (data) templates.push(JSON.parse(data));
+        });
+        localStorage.setItem('templateBlocks', JSON.stringify(templates));
+    }
+
+
 
     function updateEventGroup(event) {
         const stored = getStoredEvents();
