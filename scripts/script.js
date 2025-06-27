@@ -521,6 +521,54 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
     });
 
+    // Remove this conflicting global handler:
+    // calendar.setOption('eventReceive', ...)
+
+    // Replace with this corrected eventReceive handler:
+    calendar.on('eventReceive', function (info) {
+        console.log('eventReceive triggered', info.event.title, info.event.start);
+
+        if (!info.event.extendedProps.isTemplate) return;
+
+        console.log('Processing template drop for:', info.event.title);
+
+        // Capture ghost event details BEFORE reverting
+        const ghostEvent = info.event;
+        const start = ghostEvent.start;
+        const end = ghostEvent.end; // Get the calculated end time
+        const title = ghostEvent.title;
+        const backgroundColor = ghostEvent.backgroundColor;
+        const textColor = ghostEvent.textColor;
+        const extendedProps = ghostEvent.extendedProps;
+
+        // Prevent FullCalendar from creating its own ghost event
+        info.revert();
+
+        // Create persistent event using ghost event's calculated duration
+        const newEvent = {
+            uid: generateUID(),
+            title,
+            start: start.toISOString(),
+            end: end.toISOString(), // Use captured end time
+            color: backgroundColor,
+            textColor,
+            bgImage: extendedProps.bgImage || null,
+            tags: extendedProps.tags || [],
+            allDay: false
+        };
+
+        console.log('Creating persistent event:', newEvent);
+
+        // Add to storage
+        const stored = getStoredEvents();
+        stored.push(newEvent);
+        saveEvents(stored);
+
+        // Refresh calendar
+        console.log('Refetching events');
+        calendar.refetchEvents();
+    });
+
     function parseDuration(str) {
         const parts = str.split(':').map(Number);
         if (parts.length === 2) {
@@ -587,11 +635,9 @@ ${percent(minsInYear, totalYearMins)}% of total year
                 saveTemplateBlocksToStorage();
             });
 
-            // Add click handler for editing
-            div.addEventListener('click', function (e) {
-                if (e.target !== deleteBtn) {
-                    editTemplateBlock(div);
-                }
+            // Add click handler for editing to the CONTENT area
+            content.addEventListener('click', function (e) {
+                editTemplateBlock(div);
             });
 
             // Build template structure
@@ -602,56 +648,91 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
         setupTemplateDragAndDrop();
     }
-    // Remove this conflicting global handler:
-    // calendar.setOption('eventReceive', ...)
-
-    // Replace with this corrected eventReceive handler:
-    calendar.on('eventReceive', function (info) {
-        console.log('eventReceive triggered', info.event.title, info.event.start);
-
-        if (!info.event.extendedProps.isTemplate) return;
-
-        console.log('Processing template drop for:', info.event.title);
-
-        // Capture ghost event details BEFORE reverting
-        const ghostEvent = info.event;
-        const start = ghostEvent.start;
-        const end = ghostEvent.end; // Get the calculated end time
-        const title = ghostEvent.title;
-        const backgroundColor = ghostEvent.backgroundColor;
-        const textColor = ghostEvent.textColor;
-        const extendedProps = ghostEvent.extendedProps;
-
-        // Prevent FullCalendar from creating its own ghost event
-        info.revert();
-
-        // Create persistent event using ghost event's calculated duration
-        const newEvent = {
-            uid: generateUID(),
-            title,
-            start: start.toISOString(),
-            end: end.toISOString(), // Use captured end time
-            color: backgroundColor,
-            textColor,
-            bgImage: extendedProps.bgImage || null,
-            tags: extendedProps.tags || [],
-            allDay: false
-        };
-
-        console.log('Creating persistent event:', newEvent);
-
-        // Add to storage
-        const stored = getStoredEvents();
-        stored.push(newEvent);
-        saveEvents(stored);
-
-        // Refresh calendar
-        console.log('Refetching events');
-        calendar.refetchEvents();
-    });
 
     loadTemplateBlocksFromStorage()
+    function saveTemplateBlock(data) {
+        const container = document.getElementById('templateSidebar');
+        const div = document.createElement('div');
+        div.className = 'template-block fc-event';
+        div.setAttribute('data-event', JSON.stringify(data));
 
+        const content = document.createElement('div');
+        content.className = 'template-content';
+        content.textContent = data.title;
+        content.style.backgroundColor = data.backgroundColor;
+        content.style.color = data.textColor;
+
+        if (data.bgImage) {
+            content.style.backgroundImage = `url(${data.bgImage})`;
+            content.style.backgroundSize = 'cover';
+            content.style.backgroundBlendMode = 'multiply';
+        }
+
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'template-delete-btn';
+        deleteBtn.innerHTML = '&times;';
+        deleteBtn.title = 'Delete template';
+        deleteBtn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            div.remove();
+            saveTemplateBlocksToStorage();
+        });
+
+        div.appendChild(content);
+        div.appendChild(deleteBtn);
+        container.appendChild(div);
+
+        saveTemplateBlocksToStorage();
+    }
+
+    function saveTemplateBlocksToStorage() {
+        const templates = [];
+        document.querySelectorAll('#templateSidebar .template-block').forEach(el => {
+            const data = el.getAttribute('data-event');
+            if (data) templates.push(JSON.parse(data));
+        });
+        localStorage.setItem('templateBlocks', JSON.stringify(templates));
+    }
+
+    function editTemplateBlock(element) {
+        currentEditingTemplate = element;
+        const data = JSON.parse(element.getAttribute('data-event'));
+
+        // Calculate end time from duration
+        const [hours, minutes] = data.duration.split(':');
+        const startTime = "00:00";
+        const endTime = `${hours.padStart(2, '0')}:${minutes}`;
+
+        // // Show template-specific UI
+        // document.getElementById('deleteTemplateBtn').style.display = 'inline-block';
+        // document.querySelector('label[for="modalDaysOfWeek"]').style.display = 'none';
+        // document.getElementById('modalDaysOfWeek').style.display = 'none';
+        // document.querySelector('label[for="modalExceptions"]').style.display = 'none';
+        // document.getElementById('modalExceptions').style.display = 'none';
+        // document.querySelector('label[for="modalStartRecur"]').style.display = 'none';
+        // document.getElementById('modalStartRecur').style.display = 'none';
+        // document.querySelector('label[for="modalEndRecur"]').style.display = 'none';
+        // document.getElementById('modalEndRecur').style.display = 'none';
+
+        openModal(
+            data.title,
+            startTime,
+            endTime,
+            [],
+            data.backgroundColor,
+            data.textColor,
+            data.bgImage || '',
+            data.tags || []
+        );
+    }
+
+    function deleteTemplate() {
+        if (currentEditingTemplate) {
+            currentEditingTemplate.remove();
+            saveTemplateBlocksToStorage();
+            closeModal();
+        }
+    }
     let recentlyDraggedToSidebar = false;
 
     calendar.on('eventDragStop', function (info) {
@@ -713,49 +794,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
         return `${h}:${m}`;
     }
 
-    function saveTemplateBlock(data) {
-        const container = document.getElementById('templateSidebar');
-        const div = document.createElement('div');
-        div.className = 'template-block fc-event';
-        div.setAttribute('data-event', JSON.stringify(data));
 
-        const content = document.createElement('div');
-        content.className = 'template-content';
-        content.textContent = data.title;
-        content.style.backgroundColor = data.backgroundColor;
-        content.style.color = data.textColor;
-
-        if (data.bgImage) {
-            content.style.backgroundImage = `url(${data.bgImage})`;
-            content.style.backgroundSize = 'cover';
-            content.style.backgroundBlendMode = 'multiply';
-        }
-
-        const deleteBtn = document.createElement('button');
-        deleteBtn.className = 'template-delete-btn';
-        deleteBtn.innerHTML = '&times;';
-        deleteBtn.title = 'Delete template';
-        deleteBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            div.remove();
-            saveTemplateBlocksToStorage();
-        });
-
-        div.appendChild(content);
-        div.appendChild(deleteBtn);
-        container.appendChild(div);
-
-        saveTemplateBlocksToStorage();
-    }
-
-    function saveTemplateBlocksToStorage() {
-        const templates = [];
-        document.querySelectorAll('#templateSidebar .template-block').forEach(el => {
-            const data = el.getAttribute('data-event');
-            if (data) templates.push(JSON.parse(data));
-        });
-        localStorage.setItem('templateBlocks', JSON.stringify(templates));
-    }
 
 
 
@@ -807,6 +846,58 @@ ${percent(minsInYear, totalYearMins)}% of total year
         const imageInput = document.getElementById('modalBgImage');
         const urlFallback = document.getElementById('modalBgImageUrl').value.trim();
 
+        // Handle template saving
+        if (currentEditingTemplate) {
+            // Process image first
+            const processImage = (imageData) => {
+                const title = document.getElementById('modalTitle').value;
+                const startTime = document.getElementById('modalStartTime').value;
+                const endTime = document.getElementById('modalEndTime').value;
+                const color = document.getElementById('modalColor').value;
+                const textColor = document.getElementById('modalTextColor').value;
+                const tags = tagify ? tagify.value.map(tag => tag.value) : [];
+
+                // Calculate duration
+                const [startH, startM] = startTime.split(':').map(Number);
+                const [endH, endM] = endTime.split(':').map(Number);
+                let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+                if (totalMinutes < 0) totalMinutes += 24 * 60;
+
+                const hours = Math.floor(totalMinutes / 60);
+                const minutes = totalMinutes % 60;
+                const duration = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
+                const newData = {
+                    title,
+                    duration,
+                    tags,
+                    bgImage: imageData,
+                    backgroundColor: color,
+                    textColor: textColor
+                };
+
+                // Remove old template before creating new one
+                currentEditingTemplate.remove();
+
+                // Create updated template
+                saveTemplateBlock(newData);
+                closeModal();
+            };
+
+            // Handle image loading
+            if (imageInput.files.length > 0) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    processImage(e.target.result);
+                };
+                reader.readAsDataURL(imageInput.files[0]);
+            } else {
+                processImage(urlFallback || null);
+            }
+            return;
+        }
+
+        // Handle event saving (original code)
         if (imageInput.files.length > 0) {
             const reader = new FileReader();
             reader.onload = function (e) {
@@ -1008,6 +1099,14 @@ ${percent(minsInYear, totalYearMins)}% of total year
     function closeModal() {
         document.getElementById('eventModal').style.display = 'none';
         document.getElementById('modalBackdrop').style.display = 'none';
+
+        // Reset template editing state
+        currentEditingTemplate = null;
+        document.getElementById('deleteTemplateBtn').style.display = 'none';
+        document.querySelector('label[for="modalDaysOfWeek"]').style.display = 'block';
+        document.getElementById('modalDaysOfWeek').style.display = 'block';
+        document.querySelector('label[for="modalExceptions"]').style.display = 'block';
+        document.getElementById('modalExceptions').style.display = 'block';
     }
 
     function openModal(title, startTime, endTime, days, color, textColor, bgImage = '', tags = []) {
