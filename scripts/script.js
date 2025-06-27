@@ -1,6 +1,6 @@
 let tagify;
 let pieChart, lifetimeChart, timeProgressChart;
-
+let currentEditingTemplate = null;
 
 document.addEventListener('DOMContentLoaded', function () {
 
@@ -656,6 +656,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
         div.className = 'template-block fc-event';
         div.setAttribute('data-event', JSON.stringify(data));
 
+        // Create content container
         const content = document.createElement('div');
         content.className = 'template-content';
         content.textContent = data.title;
@@ -668,16 +669,25 @@ ${percent(minsInYear, totalYearMins)}% of total year
             content.style.backgroundBlendMode = 'multiply';
         }
 
+        // Create delete button (x)
         const deleteBtn = document.createElement('button');
         deleteBtn.className = 'template-delete-btn';
         deleteBtn.innerHTML = '&times;';
         deleteBtn.title = 'Delete template';
+
+        // Add click handler for deletion
         deleteBtn.addEventListener('click', function (e) {
             e.stopPropagation();
             div.remove();
             saveTemplateBlocksToStorage();
         });
 
+        // Add click handler for editing to the CONTENT area
+        content.addEventListener('click', function (e) {
+            editTemplateBlock(div);
+        });
+
+        // Build template structure
         div.appendChild(content);
         div.appendChild(deleteBtn);
         container.appendChild(div);
@@ -733,7 +743,6 @@ ${percent(minsInYear, totalYearMins)}% of total year
             closeModal();
         }
     }
-    let recentlyDraggedToSidebar = false;
 
     calendar.on('eventDragStop', function (info) {
         const sidebar = document.getElementById('templateSidebar');
@@ -761,23 +770,6 @@ ${percent(minsInYear, totalYearMins)}% of total year
         }
     });
 
-    // Add this at the top of your script
-    let isProcessingTemplate = false;
-
-    // ... existing code above ...
-    // Remove this entire block:
-    // calendar.setOption('eventReceive', function (info) {
-    //   console.log('Global eventReceive handler called');
-    //   return false; // Prevent FullCalendar from creating its own event
-    // });
-
-    // Replace with this modified handler:
-    // Remove this conflicting global handler:
-    // calendar.setOption('eventReceive', ...)
-
-    // Replace with this corrected eventReceive handler:
-
-    // Add this to log all events after refetch
     calendar.on('eventsSet', function (info) {
         console.log('Events after refetch:');
         calendar.getEvents().forEach(event => {
@@ -785,18 +777,12 @@ ${percent(minsInYear, totalYearMins)}% of total year
         });
     });
 
-    // ... existing code below ...
-
     function getEventDuration(event) {
         const diff = (event.end - event.start) / 60000;
         const h = Math.floor(diff / 60).toString().padStart(2, '0');
         const m = Math.round(diff % 60).toString().padStart(2, '0');
         return `${h}:${m}`;
     }
-
-
-
-
 
     function updateEventGroup(event) {
         const stored = getStoredEvents();
@@ -926,6 +912,20 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
 
         let stored = getStoredEvents();
+
+        // Remove original event(s) if editing an existing event
+        if (selectedEvent) {
+            const eventProps = selectedEvent.extendedProps || {};
+
+            // Remove recurring events by group
+            if (eventProps.daysOfWeek) {
+                stored = stored.filter(ev => ev.group !== eventProps.group);
+            }
+            // Remove single event by UID
+            else {
+                stored = stored.filter(ev => ev.uid !== selectedEvent.id);
+            }
+        }
 
         let groupId = selectedEvent?.extendedProps?.group || generateUID();
         let uid = selectedEvent ? selectedEvent.id : null;
@@ -1097,19 +1097,24 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
 
     function closeModal() {
-        document.getElementById('eventModal').style.display = 'none';
-        document.getElementById('modalBackdrop').style.display = 'none';
+        const eventModal = document.getElementById('eventModal');
+        const modalBackdrop = document.getElementById('modalBackdrop');
+
+        if (eventModal) eventModal.style.display = 'none';
+        if (modalBackdrop) modalBackdrop.style.display = 'none';
 
         // Reset template editing state
         currentEditingTemplate = null;
-        document.getElementById('deleteTemplateBtn').style.display = 'none';
-        document.querySelector('label[for="modalDaysOfWeek"]').style.display = 'block';
-        document.getElementById('modalDaysOfWeek').style.display = 'block';
-        document.querySelector('label[for="modalExceptions"]').style.display = 'block';
-        document.getElementById('modalExceptions').style.display = 'block';
+        // document.getElementById('deleteTemplateBtn').style.display = 'none';
+        // document.querySelector('label[for="modalDaysOfWeek"]').style.display = 'block';
+        // document.getElementById('modalDaysOfWeek').style.display = 'block';
+        // document.querySelector('label[for="modalExceptions"]').style.display = 'block';
+        // document.getElementById('modalExceptions').style.display = 'block';
     }
 
     function openModal(title, startTime, endTime, days, color, textColor, bgImage = '', tags = []) {
+        const eventModal = document.getElementById('eventModal');
+        if (!eventModal) return;
         document.getElementById('modalTitle').value = title;
         document.getElementById('modalStartTime').value = startTime;
         document.getElementById('modalEndTime').value = endTime;
@@ -1142,6 +1147,11 @@ ${percent(minsInYear, totalYearMins)}% of total year
         document.getElementById('modalBackdrop').style.display = 'block';
         document.getElementById('modalBgImage').value = '';
         document.getElementById('modalBgImageUrl').value = bgImage || '';
+
+        eventModal.style.display = 'block';
+
+        const modalBackdrop = document.getElementById('modalBackdrop');
+        if (modalBackdrop) modalBackdrop.style.display = 'block';
     }
 
 
