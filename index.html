@@ -1,248 +1,160 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset='utf-8' />
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css' rel='stylesheet' />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Custom Calendar App</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.min.css">
-
-    <link rel="stylesheet" href="styles/main.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
-
-    <!-- Tagify CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css">
-    <!-- Tagify JS -->
-    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
-
+    <link rel="stylesheet" href="/src/styles/main.css">
 </head>
-
 <body>
-    <div id="menuWrapper">
-        <button id="menuToggle">&#9776;</button>
-        <div id="menuDropdown" class="hidden">
-            <button id="importBtn">Import JSON</button>
-            <input type="file" id="fileInput" accept=".json" style="display: none;">
-            <button id="exportBtn">Export JSON</button>
-            <button id="toggleDashboardBtn">Toggle Dashboard</button>
-            <button id="openSettingsBtn">Settings</button>
-
-        </div>
-    </div>
-
-    <div id="templateSidebar">
-        <div class="template-block fc-event fc-h-event fc-daygrid-event fc-daygrid-block-event" data-event='{
-      "title": "Morning Focus",
-      "duration": "01:30",
-      "tags": ["focus"],
-      "bgImage": "img/focus.jpg",
-      "backgroundColor": "#2874A6",
-      "textColor": "#ffffff"
-    }' style="background-color: #2874A6; color: #ffffff;">
-            <div class="fc-event-main">Morning Focus</div>
-            
-        </div>
-    </div>
-
-    <main>
-        <div id='calendar'></div>
-
-        <div id="dashboardView" style="padding: 1rem;">
-            <h2>Dashboard</h2>
-
-            <div id="customTimeProgress" style="margin-top: 2rem;">
-                <div class="time-progress-container">
-                    <!-- Main Lifetime Bar -->
-                    <div class="mini-bar-title">Lifetime</div>
-                    <div class="time-progress-main">
-                        <div class="time-progress-spent" id="mainSpent"></div>
-                        <div class="time-progress-remaining" id="mainRemaining"></div>
-                    </div>
-                    <div class="time-sub-progress">
-                        <div class="sub-section" id="subSpent">
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeSpent" id="awakeSpent"></div>
-                                <div class="asleep-bar asleepSpent" id="asleepSpent"></div>
-                            </div>
-                        </div>
-                        <div class="sub-section" id="subRemaining">
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeRemaining" id="awakeRemaining"></div>
-                                <div class="asleep-bar asleepRemaining" id="asleepRemaining"></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Mini Bars for Day, Week, Month, Year -->
-                    <!-- Mini Bars for Day, Week, Month, Year -->
-                    <div class="mini-bars">
-
-                        <!-- Day -->
-                        <div class="mini-bar" id="miniDay">
-                            <div class="mini-bar-title">Day</div>
-                            <div class="time-progress-main">
-                                <div class="time-progress-spent" id="daySpent"></div>
-                                <div class="time-progress-remaining" id="dayRemaining"></div>
-                            </div>
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeSpent" id="dayAwakeSpent"></div>
-                                <div class="asleep-bar asleepSpent" id="dayAsleepSpent"></div>
-                                <div class="awake-bar awakeRemaining" id="dayAwakeRemaining"></div>
-                                <div class="asleep-bar asleepRemaining" id="dayAsleepRemaining"></div>
-                            </div>
-                        </div>
-
-                        <!-- Week -->
-                        <div class="mini-bar" id="miniWeek">
-                            <div class="mini-bar-title">Week</div>
-                            <div class="time-progress-main">
-                                <div class="time-progress-spent" id="weekSpent"></div>
-                                <div class="time-progress-remaining" id="weekRemaining"></div>
-                            </div>
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeSpent" id="weekAwakeSpent"></div>
-                                <div class="asleep-bar asleepSpent" id="weekAsleepSpent"></div>
-                                <div class="awake-bar awakeRemaining" id="weekAwakeRemaining"></div>
-                                <div class="asleep-bar asleepRemaining" id="weekAsleepRemaining"></div>
-                            </div>
-                        </div>
-
-                        <!-- Month -->
-                        <div class="mini-bar" id="miniMonth">
-                            <div class="mini-bar-title">Month</div>
-                            <div class="time-progress-main">
-                                <div class="time-progress-spent" id="monthSpent"></div>
-                                <div class="time-progress-remaining" id="monthRemaining"></div>
-                            </div>
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeSpent" id="monthAwakeSpent"></div>
-                                <div class="asleep-bar asleepSpent" id="monthAsleepSpent"></div>
-                                <div class="awake-bar awakeRemaining" id="monthAwakeRemaining"></div>
-                                <div class="asleep-bar asleepRemaining" id="monthAsleepRemaining"></div>
-                            </div>
-                        </div>
-
-                        <!-- Year -->
-                        <div class="mini-bar" id="miniYear">
-                            <div class="mini-bar-title">Year</div>
-                            <div class="time-progress-main">
-                                <div class="time-progress-spent" id="yearSpent"></div>
-                                <div class="time-progress-remaining" id="yearRemaining"></div>
-                            </div>
-                            <div class="awake-asleep-track">
-                                <div class="awake-bar awakeSpent" id="yearAwakeSpent"></div>
-                                <div class="asleep-bar asleepSpent" id="yearAsleepSpent"></div>
-                                <div class="awake-bar awakeRemaining" id="yearAwakeRemaining"></div>
-                                <div class="asleep-bar asleepRemaining" id="yearAsleepRemaining"></div>
-                            </div>
-                        </div>
-
-                    </div>
-
-
-                </div>
+    <div id="app">
+        <div id="menuWrapper">
+            <button id="menuToggle">&#9776;</button>
+            <div id="menuDropdown" class="hidden">
+                <button id="importBtn">Import JSON</button>
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <button id="exportBtn">Export JSON</button>
+                <button id="toggleDashboardBtn">Toggle Dashboard</button>
+                <button id="openSettingsBtn">Settings</button>
+                <button id="subscriptionBtn">Manage Subscription</button>
             </div>
         </div>
 
-
-
-
-
-
-        <label for="dashboardTagFilter">Filter by Tag:</label>
-        <input id="dashboardTagFilter" placeholder="e.g. study, exercise">
-
-        <div class="charts">
-            <canvas id="activityPieChart" height="300"></canvas>
-            <canvas id="lifetimeChart" height="1"></canvas>
-
-
+        <div id="templateSidebar">
+            <div class="template-block" data-template='{"title":"Morning Focus","duration":"01:30","tags":["focus"],"backgroundColor":"#2874A6","textColor":"#ffffff"}'>
+                <div class="template-content">Morning Focus</div>
+                <button class="template-delete-btn">&times;</button>
+            </div>
         </div>
 
+        <main>
+            <div id="calendarContainer">
+                <div id="calendarHeader">
+                    <button id="prevBtn">&lt;</button>
+                    <h2 id="currentMonth"></h2>
+                    <button id="nextBtn">&gt;</button>
+                    <div id="viewToggle">
+                        <button id="monthViewBtn" class="active">Month</button>
+                        <button id="weekViewBtn">Week</button>
+                        <button id="dayViewBtn">Day</button>
+                    </div>
+                </div>
+                <div id="calendar"></div>
+            </div>
 
-        <div id="tagTotals" style="margin-top: 1rem;"></div>
+            <div id="dashboardView" class="hidden">
+                <h2>Dashboard</h2>
+                <div id="timeProgress"></div>
+                <div id="tagFilter">
+                    <label for="dashboardTagFilter">Filter by Tag:</label>
+                    <input id="dashboardTagFilter" placeholder="e.g. study, exercise">
+                </div>
+                <div class="charts">
+                    <canvas id="activityPieChart"></canvas>
+                    <canvas id="lifetimeChart"></canvas>
+                </div>
+                <div id="tagTotals"></div>
+            </div>
+
+            <div id="settingsPanel" class="hidden">
+                <h3>Settings</h3>
+                <div class="settings-group">
+                    <label for="birthDate">Birth Date</label>
+                    <input type="datetime-local" id="birthDate">
+                </div>
+                <div class="settings-group">
+                    <label for="lifespanYears">Lifespan (years)</label>
+                    <input type="number" id="lifespanYears" step="0.01">
+                </div>
+                <div class="settings-group">
+                    <label for="deathDate">Estimated Death Date</label>
+                    <input type="datetime-local" id="deathDate" readonly>
+                </div>
+                <button id="saveSettingsBtn">Save Settings</button>
+            </div>
+        </main>
+
+        <!-- Event Modal -->
+        <div id="modalBackdrop" class="hidden"></div>
+        <div id="eventModal" class="hidden">
+            <h3 id="modalTitle">Event Details</h3>
+            <form id="eventForm">
+                <div class="form-group">
+                    <label for="eventTitle">Title:</label>
+                    <input type="text" id="eventTitle" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventStartTime">Start Time:</label>
+                    <input type="datetime-local" id="eventStartTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventEndTime">End Time:</label>
+                    <input type="datetime-local" id="eventEndTime" required>
+                </div>
+                <div class="form-group">
+                    <label for="eventColor">Background Color:</label>
+                    <input type="color" id="eventColor" value="#2874A6">
+                </div>
+                <div class="form-group">
+                    <label for="eventTextColor">Text Color:</label>
+                    <input type="color" id="eventTextColor" value="#ffffff">
+                </div>
+                <div class="form-group">
+                    <label for="eventTags">Tags (comma-separated):</label>
+                    <input type="text" id="eventTags" placeholder="work, meeting, important">
+                </div>
+                <div class="form-group">
+                    <label for="eventRecurring">Recurring:</label>
+                    <select id="eventRecurring">
+                        <option value="none">No Repeat</option>
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                        <option value="monthly">Monthly</option>
+                    </select>
+                </div>
+                <div id="colorPreview">Preview</div>
+                <div class="modal-actions">
+                    <button type="submit" id="saveEventBtn">Save</button>
+                    <button type="button" id="deleteEventBtn" class="danger">Delete</button>
+                    <button type="button" id="cancelEventBtn">Cancel</button>
+                </div>
+            </form>
         </div>
 
-
-
-        <div id="settingsPanel" style="display:none;">
-            <label for="birthDate">Birth Date</label>
-            <input type="datetime-local" id="birthDate">
-
-            <label for="lifespanYears">Lifespan (years)</label>
-            <input type="number" id="lifespanYears" step="0.01">
-
-            <label for="deathDate">Estimated Death Date</label>
-            <input type="datetime-local" id="deathDate" readonly>
-
-            <button id="saveSettingsBtn">Save</button>
+        <!-- Subscription Modal -->
+        <div id="subscriptionModal" class="hidden">
+            <div class="modal-content">
+                <h3>Subscription Plans</h3>
+                <div class="pricing-cards">
+                    <div class="pricing-card">
+                        <h4>Basic</h4>
+                        <p class="price">Free</p>
+                        <ul>
+                            <li>Up to 10 events</li>
+                            <li>Basic calendar view</li>
+                            <li>Local storage</li>
+                        </ul>
+                        <button class="plan-btn" data-plan="free">Current Plan</button>
+                    </div>
+                    <div class="pricing-card featured">
+                        <h4>Pro</h4>
+                        <p class="price">$9.99/month</p>
+                        <ul>
+                            <li>Unlimited events</li>
+                            <li>Cloud sync</li>
+                            <li>Advanced analytics</li>
+                            <li>Export features</li>
+                        </ul>
+                        <button class="plan-btn" data-plan="pro">Upgrade</button>
+                    </div>
+                </div>
+                <button id="closeSubscriptionModal">Close</button>
+            </div>
         </div>
-
-    </main>
-
-
-
-
-    <div id="dayActionMenu"
-        style="position:absolute; background:white; border:1px solid #ccc; z-index:1000; box-shadow:0 2px 5px rgba(0,0,0,0.2); padding:5px;">
-        <div class="menu-item" data-action="unlinkAll">Unlink All</div>
     </div>
 
-    <div id="eventTooltip"
-        style="display:none; position:absolute; background:#333; color:white; padding:8px; border-radius:4px; font-size:12px; z-index:2000;">
-    </div>
-
-    <div id="modalBackdrop"></div>
-    <div id="eventModal">
-        <label>Class Name: <input type="text" id="modalTitle" /></label>
-        <label>Start Time: <input type="time" id="modalStartTime" /></label>
-        <label>End Time: <input type="time" id="modalEndTime" /></label>
-        <label>Repeat on Days:<br>
-            <select id="modalDaysOfWeek" multiple>
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-            </select>
-        </label>
-        <label for="modalStartRecur">Start Recur</label>
-        <input type="date" id="modalStartRecur" name="modalStartRecur">
-
-        <label for="modalEndRecur">End Recur</label>
-        <input type="date" id="modalEndRecur" name="modalEndRecur">
-
-        <label for="modalExceptions">Skip Specific Dates (one per line)</label>
-        <textarea id="modalExceptions" placeholder="2025-06-27\n2025-07-04" rows="3" style="width: 100%;"></textarea>
-
-        <label>Background Color: <input type="color" id="modalColor" onchange="updatePreview()" /></label>
-        <label>Background Image:
-            <input type="file" id="modalBgImage" accept="image/*">
-        </label>
-        <label>Background Image URL: <input type="text" id="modalBgImageUrl" placeholder="https://..." /></label>
-        <label for="modalTags">Tags:</label>
-        <input id="modalTags" placeholder="e.g. activity, event" />
-
-
-
-
-        <label>Text Color: <input type="color" id="modalTextColor" value="#ffffff" onchange="updatePreview()" /></label>
-        <div id="colorPreview">Preview</div>
-        <button id="saveBtn">Save</button>
-        <button id="duplicateBtn">Duplicate</button>
-        <button id="unlinkBtn" style="background: #ffcc00; color: #000;">Unlink</button>
-
-        <button id="deleteBtn">Delete</button>
-        <button id="cancelBtn">Cancel</button>
-    </div>
-
-
-
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-    <script src="scripts/script.js"></script>
+    <script type="module" src="/src/main.js"></script>
 </body>
-
 </html>
