@@ -1,5 +1,5 @@
 import { CalendarApp } from './components/CalendarApp.js';
-import { supabase } from './services/supabase.js';
+import { supabase, isSupabaseConfigured } from './services/supabase.js';
 import { AuthService } from './services/auth.js';
 
 class App {
@@ -11,23 +11,29 @@ class App {
 
     async init() {
         try {
-            // Check authentication status
-            const { data: { session } } = await supabase.auth.getSession();
-            
-            if (session) {
-                this.initCalendarApp();
-            } else {
-                this.showAuthUI();
-            }
-
-            // Listen for auth changes
-            supabase.auth.onAuthStateChange((event, session) => {
-                if (event === 'SIGNED_IN') {
+            // Check if Supabase is configured before using it
+            if (isSupabaseConfigured()) {
+                // Check authentication status
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session) {
                     this.initCalendarApp();
-                } else if (event === 'SIGNED_OUT') {
+                } else {
                     this.showAuthUI();
                 }
-            });
+
+                // Listen for auth changes
+                supabase.auth.onAuthStateChange((event, session) => {
+                    if (event === 'SIGNED_IN') {
+                        this.initCalendarApp();
+                    } else if (event === 'SIGNED_OUT') {
+                        this.showAuthUI();
+                    }
+                });
+            } else {
+                // Supabase not configured, run in offline mode
+                this.initCalendarApp();
+            }
         } catch (error) {
             console.error('App initialization error:', error);
             this.initCalendarApp(); // Fallback to offline mode
