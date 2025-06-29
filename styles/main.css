@@ -246,40 +246,59 @@ button {
 }
 
 #templateSidebar {
-    opacity: 50%;
     position: fixed;
     top: 10%;
-    left: 10px; /* optional: anchor to left side */
+    left: 10px;
     z-index: 99;
+
     width: 200px;
-    min-height: 100px;
+    /* min-width: 150px; */
+    /* min-height: 100px; */
     height: 150px;
 
-    padding: 0px;
-    overflow: auto; /* required for resize to work properly */
-    resize: both;   /* enables bottom-right corner resizing */
-
+    resize: both;
+    overflow: auto;
+    overflow-y: scroll;
+    /* instead of auto */
+    /* opacity: 50%; */
+    transition: opacity ease-out 0.35s;
     display: flex;
     flex-direction: column;
     gap: 2px;
 
     scrollbar-color: lightgray transparent;
-    transition: opacity ease-out 0.35s;
 
-    /* Optional: visual cue for resizability */
     /* border: 1px solid #ccc; */
-    background: rgba(255, 255, 255, 0.05); /* optional transparent look */
+    background: rgba(255, 255, 255, 0.05);
 }
 
-#templateSidebar:hover {
-    opacity: 100%;
+/* Keep resize visible */
+#templateSidebar::after {
+    content: '';
+    position: absolute;
+    right: 2px;
+    bottom: 2px;
+    width: 12px;
+    height: 12px;
+    background: linear-gradient(135deg, transparent 0%, transparent 50%, gray 50%, gray 100%);
+    pointer-events: none;
+    /* Don't block resizing */
 }
 
 /* Add to your CSS */
 .template-block {
+    opacity: 50%;
     position: relative;
     padding-right: 25px;
     /* Space for delete button */
+}
+
+.templateSidebar:hover {
+    opacity: 100%;
+}
+
+.template-block:hover {
+    opacity: 100%;
 }
 
 .template-content {

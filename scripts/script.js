@@ -1228,14 +1228,20 @@ ${percent(minsInYear, totalYearMins)}% of total year
         document.getElementById('menuDropdown').classList.toggle('hidden');
     });
 
+    // Update export function
     document.getElementById('exportBtn').addEventListener('click', function () {
-        const events = JSON.parse(localStorage.getItem('calendarEvents') || '[]');
-        const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
+        const exportData = {
+            calendarEvents: JSON.parse(localStorage.getItem('calendarEvents') || '[]'),
+            userSettings: JSON.parse(localStorage.getItem('userSettings') || '{}'),
+            templateBlocks: JSON.parse(localStorage.getItem('templateBlocks') || '[]')
+        };
+
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
 
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'calendar-events.json';
+        a.download = 'calendar-backup.json';
         a.click();
 
         URL.revokeObjectURL(url);
@@ -1246,6 +1252,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
         document.getElementById('fileInput').click();
     });
 
+    // Update import function
     document.getElementById('fileInput').addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1253,11 +1260,32 @@ ${percent(minsInYear, totalYearMins)}% of total year
         reader.onload = function (event) {
             try {
                 const imported = JSON.parse(event.target.result);
-                localStorage.setItem('calendarEvents', JSON.stringify(imported));
+
+                // Import calendar events
+                if (imported.calendarEvents) {
+                    localStorage.setItem('calendarEvents', JSON.stringify(imported.calendarEvents));
+                }
+
+                // Import user settings
+                if (imported.userSettings) {
+                    localStorage.setItem('userSettings', JSON.stringify(imported.userSettings));
+                }
+
+                // Import templates
+                if (imported.templateBlocks) {
+                    localStorage.setItem('templateBlocks', JSON.stringify(imported.templateBlocks));
+                }
+
+                // Refresh UI
                 calendar.refetchEvents();
+                loadTemplateBlocksFromStorage();
+                updateDashboardChart();
+                renderCustomTimeProgressBar();
+
+                alert('Import successful!');
 
             } catch (err) {
-                alert('Invalid JSON file.');
+                alert('Invalid backup file.');
             }
         };
         reader.readAsText(file);
@@ -1336,7 +1364,6 @@ ${percent(minsInYear, totalYearMins)}% of total year
     // }
 
     function updateDashboardChart() {
-
         const storedEvents = getStoredEvents();
         const selectedTags = dashboardTagify.value.map(tag => tag.value);
 
@@ -1364,7 +1391,22 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
         const labels = Object.keys(titleDurations);
         const data = labels.map(title => titleDurations[title]);
-        const total = data.reduce((a, b) => a + b, 0);
+        let total = data.reduce((a, b) => a + b, 0);
+
+        // 🔍 Fetch birth and death dates from settings
+        const userSettings = JSON.parse(localStorage.getItem('userSettings') || '{}');
+        const birth = userSettings.birthDate ? new Date(userSettings.birthDate) : null;
+        const death = userSettings.deathDate ? new Date(userSettings.deathDate) : null;
+
+        if (birth && death && !isNaN(birth) && !isNaN(death) && death > birth) {
+            const totalLifespanMinutes = (death - birth) / (1000 * 60); // milliseconds to minutes
+            const unallocated = Math.max(0, totalLifespanMinutes - total);
+            if (unallocated > 0) {
+                labels.push('Unallocated');
+                data.push(unallocated);
+                total += unallocated;
+            }
+        }
 
         if (window.pieChart) window.pieChart.destroy();
 
@@ -1375,24 +1417,42 @@ ${percent(minsInYear, totalYearMins)}% of total year
                 labels: labels,
                 datasets: [{
                     data: data,
-                    backgroundColor: labels.map(() => `hsl(${Math.random() * 360}, 70%, 60%)`)
+                    backgroundColor: labels.map(label =>
+                        label === 'Unallocated' ? '#cccccc' : `hsl(${Math.random() * 360}, 70%, 60%)`
+                    )
                 }]
             },
             options: {
                 plugins: {
                     datalabels: {
                         color: '#fff',
-                        formatter: (value, context) => {
-                            const percent = ((value / total) * 100).toFixed(1);
+                        formatter: function (value, context) {
+                            const chart = context.chart;
+                            const dataset = chart.data.datasets[0];
+                            const meta = chart.getDatasetMeta(0);
+
+                            // ✅ Recalculate total from only visible slices
+                            const visibleTotal = dataset.data.reduce((acc, val, i) => {
+                                return !meta.data[i].hidden ? acc + val : acc;
+                            }, 0);
+
+                            const percent = ((value / visibleTotal) * 100).toFixed(1);
                             return `${percent}%`;
                         }
+
                     },
                     tooltip: {
                         callbacks: {
                             label: function (ctx) {
                                 const label = ctx.label || '';
                                 const value = ctx.parsed;
-                                const percent = ((value / total) * 100).toFixed(1);
+                                const chart = ctx.chart;
+                                const dataset = chart.data.datasets[0];
+                                const visibleTotal = dataset.data.reduce((acc, val, i) => {
+                                    const meta = chart.getDatasetMeta(0);
+                                    return !meta.data[i].hidden ? acc + val : acc;
+                                }, 0);
+                                const percent = ((value / visibleTotal) * 100).toFixed(1);
                                 return `${label}: ${Math.round(value)} mins (${percent}%)`;
                             }
                         }
@@ -1400,8 +1460,21 @@ ${percent(minsInYear, totalYearMins)}% of total year
                     legend: {
                         labels: {
                             color: '#000'
+                        },
+                        onClick: function (e, legendItem, legend) {
+                            const chart = legend.chart;
+                            const index = legendItem.index;
+                            const meta = chart.getDatasetMeta(0);
+                            const item = meta.data[index];
+
+                            // Toggle hidden state
+                            item.hidden = !item.hidden;
+                            chart.update(); // 👈 Force re-render to refresh datalabels
                         }
                     }
+
+
+
                 }
             },
             plugins: [ChartDataLabels]
@@ -1409,6 +1482,7 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
         estimateLifetimeUsageChart();
     }
+
 
     function loadSettings() {
         const panel = document.getElementById('settingsPanel');
