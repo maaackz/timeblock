@@ -14,13 +14,29 @@ export class EventService {
             return stored ? JSON.parse(stored) : [];
         }
 
-        const { data, error } = await supabase
-            .from(this.tableName)
-            .select('*')
-            .order('start_time', { ascending: true });
+        try {
+            // Get current user first
+            const user = await this.authService.getCurrentUser();
+            if (!user) {
+                // If no user is authenticated, return empty array or fallback to localStorage
+                const stored = localStorage.getItem('calendar-events');
+                return stored ? JSON.parse(stored) : [];
+            }
 
-        if (error) throw error;
-        return data || [];
+            const { data, error } = await supabase
+                .from(this.tableName)
+                .select('*')
+                .eq('user_id', user.id)
+                .order('start_time', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Failed to fetch events from Supabase:', error);
+            // Fallback to localStorage
+            const stored = localStorage.getItem('calendar-events');
+            return stored ? JSON.parse(stored) : [];
+        }
     }
 
     async saveEvent(eventData) {
@@ -56,12 +72,14 @@ export class EventService {
             user_id: user.id
         };
 
+        // Check if this is an update to an existing event with a valid UUID
         if (eventData.id && this.isValidUUID(eventData.id)) {
             // Update existing event - only if ID is a valid UUID
             const { data, error } = await supabase
                 .from(this.tableName)
                 .update(eventPayload)
                 .eq('id', eventData.id)
+                .eq('user_id', user.id) // Ensure user can only update their own events
                 .select()
                 .single();
 
@@ -69,6 +87,7 @@ export class EventService {
             return data;
         } else {
             // Create new event - remove any existing ID to let Supabase generate UUID
+            // This handles both new events and events with timestamp IDs from localStorage
             const { id, ...eventWithoutId } = eventPayload;
             
             const { data, error } = await supabase
@@ -91,10 +110,17 @@ export class EventService {
             return;
         }
 
+        // Get current user for Supabase operations
+        const user = await this.authService.getCurrentUser();
+        if (!user) {
+            throw new Error('User must be authenticated to delete events');
+        }
+
         const { error } = await supabase
             .from(this.tableName)
             .delete()
-            .eq('id', eventId);
+            .eq('id', eventId)
+            .eq('user_id', user.id); // Ensure user can only delete their own events
 
         if (error) throw error;
     }
@@ -108,15 +134,37 @@ export class EventService {
             });
         }
 
-        const { data, error } = await supabase
-            .from(this.tableName)
-            .select('*')
-            .gte('start_time', startDate.toISOString())
-            .lte('start_time', endDate.toISOString())
-            .order('start_time', { ascending: true });
+        try {
+            // Get current user first
+            const user = await this.authService.getCurrentUser();
+            if (!user) {
+                // If no user is authenticated, fallback to localStorage
+                const events = await this.getEvents();
+                return events.filter(event => {
+                    const eventDate = new Date(event.start_time);
+                    return eventDate >= startDate && eventDate <= endDate;
+                });
+            }
 
-        if (error) throw error;
-        return data || [];
+            const { data, error } = await supabase
+                .from(this.tableName)
+                .select('*')
+                .eq('user_id', user.id)
+                .gte('start_time', startDate.toISOString())
+                .lte('start_time', endDate.toISOString())
+                .order('start_time', { ascending: true });
+
+            if (error) throw error;
+            return data || [];
+        } catch (error) {
+            console.error('Failed to fetch events by date range from Supabase:', error);
+            // Fallback to localStorage
+            const events = await this.getEvents();
+            return events.filter(event => {
+                const eventDate = new Date(event.start_time);
+                return eventDate >= startDate && eventDate <= endDate;
+            });
+        }
     }
 
     // Helper method to validate UUID format

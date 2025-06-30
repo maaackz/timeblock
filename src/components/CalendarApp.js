@@ -108,7 +108,7 @@ export class CalendarApp {
     async saveEvent(eventData) {
         try {
             const savedEvent = await this.eventService.saveEvent(eventData);
-            if (eventData.id) {
+            if (eventData.id && this.eventService.isValidUUID && this.eventService.isValidUUID(eventData.id)) {
                 // Update existing event
                 const index = this.events.findIndex(e => e.id === eventData.id);
                 if (index !== -1) {
@@ -122,19 +122,7 @@ export class CalendarApp {
             return savedEvent;
         } catch (error) {
             console.error('Failed to save event:', error);
-            // Fallback to localStorage
-            if (eventData.id) {
-                const index = this.events.findIndex(e => e.id === eventData.id);
-                if (index !== -1) {
-                    this.events[index] = eventData;
-                }
-            } else {
-                eventData.id = Date.now().toString();
-                this.events.push(eventData);
-            }
-            localStorage.setItem('calendar-events', JSON.stringify(this.events));
-            this.render();
-            return eventData;
+            throw error; // Re-throw to let the calling component handle the error
         }
     }
 
@@ -145,10 +133,7 @@ export class CalendarApp {
             this.render();
         } catch (error) {
             console.error('Failed to delete event:', error);
-            // Fallback to localStorage
-            this.events = this.events.filter(e => e.id !== eventId);
-            localStorage.setItem('calendar-events', JSON.stringify(this.events));
-            this.render();
+            throw error; // Re-throw to let the calling component handle the error
         }
     }
 
