@@ -47,9 +47,9 @@ export class EventModal {
             document.getElementById('modalTitle').textContent = 'Edit Event';
             document.getElementById('eventTitle').value = event.title || '';
             document.getElementById('eventStartTime').value = event.start_time ? 
-                new Date(event.start_time).toISOString().slice(0, 16) : '';
+                this.formatDateTimeLocal(new Date(event.start_time)) : '';
             document.getElementById('eventEndTime').value = event.end_time ? 
-                new Date(event.end_time).toISOString().slice(0, 16) : '';
+                this.formatDateTimeLocal(new Date(event.end_time)) : '';
             document.getElementById('eventColor').value = event.background_color || '#2874A6';
             document.getElementById('eventTextColor').value = event.text_color || '#ffffff';
             document.getElementById('eventTags').value = event.tags || '';
@@ -82,8 +82,6 @@ export class EventModal {
     }
 
     async saveEvent() {
-        const formData = new FormData(document.getElementById('eventForm'));
-        
         const eventData = {
             title: document.getElementById('eventTitle').value,
             start_time: document.getElementById('eventStartTime').value,
@@ -105,10 +103,18 @@ export class EventModal {
             return;
         }
 
-        if (new Date(eventData.start_time) >= new Date(eventData.end_time)) {
+        // Convert to proper ISO format with timezone handling
+        const startDate = new Date(eventData.start_time);
+        const endDate = new Date(eventData.end_time);
+
+        if (startDate >= endDate) {
             alert('End time must be after start time.');
             return;
         }
+
+        // Convert to ISO string for storage
+        eventData.start_time = startDate.toISOString();
+        eventData.end_time = endDate.toISOString();
 
         // Add ID if editing existing event
         if (this.currentEvent) {
@@ -142,5 +148,15 @@ export class EventModal {
         preview.style.backgroundColor = bgColor;
         preview.style.color = textColor;
         preview.textContent = 'Preview';
+    }
+
+    formatDateTimeLocal(date) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 }

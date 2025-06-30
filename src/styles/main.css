@@ -81,7 +81,7 @@ body {
     top: 100px;
     left: 20px;
     width: 200px;
-    max-height: 400px;
+    max-height: 500px;
     background: rgba(255, 255, 255, 0.95);
     border-radius: 12px;
     padding: 16px;
@@ -90,11 +90,20 @@ body {
     z-index: 999;
     backdrop-filter: blur(10px);
     transition: opacity 0.3s ease;
-    opacity: 0.7;
+    opacity: 0.8;
 }
 
 #templateSidebar:hover {
     opacity: 1;
+}
+
+.template-header {
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: #2c3e50;
+    text-align: center;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 8px;
 }
 
 .template-block {
@@ -144,6 +153,27 @@ body {
 
 .template-delete-btn:hover {
     background: rgba(255,0,0,0.7);
+}
+
+.template-drop-zone {
+    margin-top: 16px;
+    padding: 20px;
+    border: 2px dashed #bdc3c7;
+    border-radius: 8px;
+    text-align: center;
+    color: #7f8c8d;
+    font-size: 12px;
+    transition: all 0.2s ease;
+}
+
+.template-drop-zone.drag-over {
+    border-color: #3498db;
+    background: rgba(52, 152, 219, 0.1);
+    color: #3498db;
+}
+
+.drop-zone-text {
+    pointer-events: none;
 }
 
 /* Main Content */
@@ -265,6 +295,11 @@ main {
     background: #fafafa;
 }
 
+.calendar-day.drag-over {
+    background: rgba(52, 152, 219, 0.1);
+    border: 2px dashed #3498db;
+}
+
 .day-number {
     font-weight: 600;
     font-size: 16px;
@@ -287,11 +322,23 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    position: relative;
+    user-select: none;
 }
 
 .event-preview:hover {
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+.event-preview.multi-day {
+    border-left: 4px solid rgba(255,255,255,0.5);
+}
+
+.multi-day-indicator {
+    float: right;
+    font-size: 10px;
+    opacity: 0.7;
 }
 
 /* Week and Day Views */
@@ -368,17 +415,22 @@ main {
     border-right: none;
 }
 
+.time-slot.drag-over {
+    background: rgba(52, 152, 219, 0.1);
+    border: 2px dashed #3498db;
+}
+
 .event-block {
     position: absolute;
     left: 2px;
     right: 2px;
-    top: 2px;
     border-radius: 4px;
     padding: 4px 8px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
     z-index: 10;
+    user-select: none;
 }
 
 .event-block:hover {
@@ -395,6 +447,44 @@ main {
 .event-time {
     font-size: 10px;
     opacity: 0.8;
+}
+
+/* Resize Handles */
+.resize-handle {
+    position: absolute;
+    background: rgba(255,255,255,0.8);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    z-index: 100;
+}
+
+.event-preview:hover .resize-handle,
+.event-block:hover .resize-handle {
+    opacity: 1;
+}
+
+.resize-handle-bottom {
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+}
+
+.resize-handle-top {
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    cursor: ns-resize;
+}
+
+.resize-handle-right {
+    top: 0;
+    bottom: 0;
+    right: 0;
+    width: 4px;
+    cursor: ew-resize;
 }
 
 /* Dashboard Styles */

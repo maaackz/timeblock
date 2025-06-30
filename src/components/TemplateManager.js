@@ -8,6 +8,7 @@ export class TemplateManager {
     init() {
         this.renderTemplates();
         this.setupDragAndDrop();
+        this.setupEventToTemplateConversion();
     }
 
     loadTemplates() {
@@ -47,11 +48,12 @@ export class TemplateManager {
     renderTemplates() {
         const sidebar = document.getElementById('templateSidebar');
         
-        let html = '';
+        let html = '<div class="template-header">Templates</div>';
         this.templates.forEach(template => {
             html += `
                 <div class="template-block" 
                      data-template-id="${template.id}"
+                     draggable="true"
                      style="background-color: ${template.backgroundColor}; color: ${template.textColor}">
                     <div class="template-content">${template.title}</div>
                     <button class="template-delete-btn" data-template-id="${template.id}">&times;</button>
@@ -59,8 +61,16 @@ export class TemplateManager {
             `;
         });
 
+        // Add drop zone for creating templates from events
+        html += `
+            <div class="template-drop-zone" id="templateDropZone">
+                <div class="drop-zone-text">Drop events here to create templates</div>
+            </div>
+        `;
+
         sidebar.innerHTML = html;
         this.attachTemplateListeners();
+        this.setupTemplateDropZone();
     }
 
     attachTemplateListeners() {
@@ -78,42 +88,87 @@ export class TemplateManager {
         const templateBlocks = document.querySelectorAll('.template-block');
         
         templateBlocks.forEach(block => {
-            block.draggable = true;
-            
             block.addEventListener('dragstart', (e) => {
                 const templateId = block.dataset.templateId;
                 const template = this.templates.find(t => t.id === templateId);
-                e.dataTransfer.setData('application/json', JSON.stringify(template));
-                e.dataTransfer.effectAllowed = 'copy';
+                if (template) {
+                    e.dataTransfer.setData('application/json', JSON.stringify(template));
+                    e.dataTransfer.effectAllowed = 'copy';
+                    block.style.opacity = '0.5';
+                }
+            });
+
+            block.addEventListener('dragend', (e) => {
+                block.style.opacity = '1';
             });
         });
-
-        // Setup drop zones on calendar
-        this.setupCalendarDropZones();
     }
 
-    setupCalendarDropZones() {
-        const calendar = document.getElementById('calendar');
-        
-        calendar.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = 'copy';
-        });
-
-        calendar.addEventListener('drop', (e) => {
-            e.preventDefault();
-            
-            try {
-                const template = JSON.parse(e.dataTransfer.getData('application/json'));
-                const dropTarget = e.target.closest('.calendar-day, .time-slot');
-                
-                if (dropTarget) {
-                    this.createEventFromTemplate(template, dropTarget);
+    setupEventToTemplateConversion() {
+        // This will be called when events are dragged to the template area
+        document.addEventListener('dragstart', (e) => {
+            if (e.target.classList.contains('event-preview') || e.target.classList.contains('event-block')) {
+                const eventId = e.target.dataset.eventId;
+                const event = this.app.events.find(ev => ev.id === eventId);
+                if (event) {
+                    e.dataTransfer.setData('event-data', JSON.stringify(event));
                 }
-            } catch (error) {
-                console.error('Failed to create event from template:', error);
             }
         });
+    }
+
+    setupTemplateDropZone() {
+        const dropZone = document.getElementById('templateDropZone');
+        if (!dropZone) return;
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'copy';
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            
+            try {
+                const eventData = e.dataTransfer.getData('event-data');
+                if (eventData) {
+                    const event = JSON.parse(eventData);
+                    this.createTemplateFromEvent(event);
+                }
+            } catch (error) {
+                console.error('Failed to create template from event:', error);
+            }
+        });
+    }
+
+    createTemplateFromEvent(event) {
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time);
+        const durationMs = end.getTime() - start.getTime();
+        const hours = Math.floor(durationMs / (1000 * 60 * 60));
+        const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+        
+        const template = {
+            id: Date.now().toString(),
+            title: event.title,
+            duration: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`,
+            backgroundColor: event.background_color,
+            textColor: event.text_color,
+            tags: event.tags || ''
+        };
+
+        this.templates.push(template);
+        this.saveTemplates();
+        this.renderTemplates();
+        this.setupDragAndDrop();
+        
+        alert(`Template "${template.title}" created successfully!`);
     }
 
     createEventFromTemplate(template, dropTarget) {
@@ -131,8 +186,8 @@ export class TemplateManager {
 
         const eventData = {
             title: template.title,
-            start_time: startTime.toISOString().slice(0, 16),
-            end_time: endTime.toISOString().slice(0, 16),
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
             background_color: template.backgroundColor,
             text_color: template.textColor,
             tags: template.tags || '',

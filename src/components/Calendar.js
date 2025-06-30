@@ -2,6 +2,8 @@ export class Calendar {
     constructor(app) {
         this.app = app;
         this.calendarEl = document.getElementById('calendar');
+        this.draggedEvent = null;
+        this.resizeHandle = null;
     }
 
     render() {
@@ -65,6 +67,7 @@ export class Calendar {
         html += '</div>';
         this.calendarEl.innerHTML = html;
         this.attachEventListeners();
+        this.setupDragAndDrop();
     }
 
     renderWeekView() {
@@ -108,7 +111,7 @@ export class Calendar {
                     <div class="time-slot" 
                          data-date="${currentDay.toISOString().split('T')[0]}" 
                          data-hour="${hour}">
-                        ${slotEvents.map(event => this.renderEventBlock(event)).join('')}
+                        ${slotEvents.map(event => this.renderEventBlock(event, hour)).join('')}
                     </div>
                 `;
             }
@@ -118,6 +121,7 @@ export class Calendar {
         
         this.calendarEl.innerHTML = html;
         this.attachEventListeners();
+        this.setupDragAndDrop();
     }
 
     renderDayView() {
@@ -138,7 +142,7 @@ export class Calendar {
                     <div class="time-slot" 
                          data-date="${date.toISOString().split('T')[0]}" 
                          data-hour="${hour}">
-                        ${slotEvents.map(event => this.renderEventBlock(event)).join('')}
+                        ${slotEvents.map(event => this.renderEventBlock(event, hour)).join('')}
                     </div>
                 </div>
             `;
@@ -147,13 +151,19 @@ export class Calendar {
         
         this.calendarEl.innerHTML = html;
         this.attachEventListeners();
+        this.setupDragAndDrop();
     }
 
     getEventsForDate(date) {
         const dateStr = date.toISOString().split('T')[0];
         return this.app.events.filter(event => {
-            const eventDate = new Date(event.start_time).toISOString().split('T')[0];
-            return eventDate === dateStr;
+            const eventStart = new Date(event.start_time);
+            const eventEnd = new Date(event.end_time);
+            const eventStartDate = eventStart.toISOString().split('T')[0];
+            const eventEndDate = eventEnd.toISOString().split('T')[0];
+            
+            // Check if event spans this date
+            return dateStr >= eventStartDate && dateStr <= eventEndDate;
         });
     }
 
@@ -162,43 +172,240 @@ export class Calendar {
         return this.app.events.filter(event => {
             const eventStart = new Date(event.start_time);
             const eventEnd = new Date(event.end_time);
-            const eventDateStr = eventStart.toISOString().split('T')[0];
+            const eventStartDate = eventStart.toISOString().split('T')[0];
+            const eventEndDate = eventEnd.toISOString().split('T')[0];
             
-            if (eventDateStr !== dateStr) return false;
+            // Check if event is active during this hour on this date
+            if (dateStr < eventStartDate || dateStr > eventEndDate) return false;
             
             const eventStartHour = eventStart.getHours();
             const eventEndHour = eventEnd.getHours();
+            const eventStartMinutes = eventStart.getMinutes();
+            const eventEndMinutes = eventEnd.getMinutes();
             
-            return hour >= eventStartHour && hour < eventEndHour;
+            // If it's the start date, check if hour is after start time
+            if (dateStr === eventStartDate && hour < eventStartHour) return false;
+            if (dateStr === eventStartDate && hour === eventStartHour && eventStartMinutes > 0 && hour < eventStartHour + 1) return false;
+            
+            // If it's the end date, check if hour is before end time
+            if (dateStr === eventEndDate && hour >= eventEndHour) return false;
+            if (dateStr === eventEndDate && hour === eventEndHour - 1 && eventEndMinutes === 0) return false;
+            
+            return true;
         });
     }
 
     renderEventPreview(event) {
+        const start = new Date(event.start_time);
+        const end = new Date(event.end_time);
+        const isMultiDay = start.toDateString() !== end.toDateString();
+        
         return `
-            <div class="event-preview" 
+            <div class="event-preview ${isMultiDay ? 'multi-day' : ''}" 
                  style="background-color: ${event.background_color}; color: ${event.text_color}"
-                 data-event-id="${event.id}">
+                 data-event-id="${event.id}"
+                 draggable="true">
                 ${event.title}
+                ${isMultiDay ? '<span class="multi-day-indicator">↔</span>' : ''}
+                <div class="resize-handle resize-handle-right"></div>
             </div>
         `;
     }
 
-    renderEventBlock(event) {
+    renderEventBlock(event, currentHour) {
         const start = new Date(event.start_time);
         const end = new Date(event.end_time);
-        const duration = (end - start) / (1000 * 60 * 60); // hours
-        const height = Math.max(30, duration * 60); // minimum 30px
+        
+        // Calculate position and height based on time
+        const startHour = start.getHours();
+        const startMinutes = start.getMinutes();
+        const endHour = end.getHours();
+        const endMinutes = end.getMinutes();
+        
+        // Calculate top offset within the hour slot
+        const topOffset = currentHour === startHour ? (startMinutes / 60) * 60 : 0;
+        
+        // Calculate height
+        let height;
+        if (currentHour === startHour && currentHour === endHour) {
+            // Event starts and ends in same hour
+            height = ((endMinutes - startMinutes) / 60) * 60;
+        } else if (currentHour === startHour) {
+            // Event starts in this hour
+            height = ((60 - startMinutes) / 60) * 60;
+        } else if (currentHour === endHour) {
+            // Event ends in this hour
+            height = (endMinutes / 60) * 60;
+        } else {
+            // Event spans full hour
+            height = 60;
+        }
+        
+        height = Math.max(20, height); // Minimum height
         
         return `
             <div class="event-block" 
                  style="background-color: ${event.background_color}; 
                         color: ${event.text_color}; 
-                        height: ${height}px"
-                 data-event-id="${event.id}">
+                        height: ${height}px;
+                        top: ${topOffset}px"
+                 data-event-id="${event.id}"
+                 draggable="true">
                 <div class="event-title">${event.title}</div>
                 <div class="event-time">${start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}</div>
+                <div class="resize-handle resize-handle-bottom"></div>
+                <div class="resize-handle resize-handle-top"></div>
             </div>
         `;
+    }
+
+    setupDragAndDrop() {
+        // Setup event dragging
+        this.calendarEl.querySelectorAll('.event-preview, .event-block').forEach(eventEl => {
+            eventEl.addEventListener('dragstart', (e) => {
+                this.draggedEvent = {
+                    id: eventEl.dataset.eventId,
+                    element: eventEl
+                };
+                e.dataTransfer.effectAllowed = 'move';
+                eventEl.style.opacity = '0.5';
+            });
+
+            eventEl.addEventListener('dragend', (e) => {
+                eventEl.style.opacity = '1';
+                this.draggedEvent = null;
+            });
+        });
+
+        // Setup drop zones
+        this.calendarEl.querySelectorAll('.calendar-day, .time-slot').forEach(slot => {
+            slot.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                slot.classList.add('drag-over');
+            });
+
+            slot.addEventListener('dragleave', (e) => {
+                slot.classList.remove('drag-over');
+            });
+
+            slot.addEventListener('drop', (e) => {
+                e.preventDefault();
+                slot.classList.remove('drag-over');
+                
+                if (this.draggedEvent) {
+                    this.moveEvent(this.draggedEvent.id, slot);
+                } else {
+                    // Handle template drop
+                    try {
+                        const templateData = e.dataTransfer.getData('application/json');
+                        if (templateData) {
+                            const template = JSON.parse(templateData);
+                            this.app.templateManager.createEventFromTemplate(template, slot);
+                        }
+                    } catch (error) {
+                        console.error('Failed to handle drop:', error);
+                    }
+                }
+            });
+        });
+
+        // Setup resize handles
+        this.setupResizeHandles();
+    }
+
+    setupResizeHandles() {
+        this.calendarEl.querySelectorAll('.resize-handle').forEach(handle => {
+            handle.addEventListener('mousedown', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                
+                const eventEl = handle.closest('.event-preview, .event-block');
+                const eventId = eventEl.dataset.eventId;
+                const event = this.app.events.find(e => e.id === eventId);
+                
+                if (!event) return;
+                
+                this.startResize(event, handle, e);
+            });
+        });
+    }
+
+    startResize(event, handle, startEvent) {
+        const isBottom = handle.classList.contains('resize-handle-bottom');
+        const isTop = handle.classList.contains('resize-handle-top');
+        const isRight = handle.classList.contains('resize-handle-right');
+        
+        const startY = startEvent.clientY;
+        const startX = startEvent.clientX;
+        const originalStart = new Date(event.start_time);
+        const originalEnd = new Date(event.end_time);
+        
+        const mouseMoveHandler = (e) => {
+            const deltaY = e.clientY - startY;
+            const deltaX = e.clientX - startX;
+            
+            if (isBottom) {
+                // Resize end time
+                const hoursDelta = Math.round(deltaY / 60); // Assuming 60px per hour
+                const newEnd = new Date(originalEnd.getTime() + (hoursDelta * 60 * 60 * 1000));
+                if (newEnd > originalStart) {
+                    event.end_time = newEnd.toISOString();
+                }
+            } else if (isTop) {
+                // Resize start time
+                const hoursDelta = Math.round(deltaY / 60);
+                const newStart = new Date(originalStart.getTime() + (hoursDelta * 60 * 60 * 1000));
+                if (newStart < originalEnd) {
+                    event.start_time = newStart.toISOString();
+                }
+            } else if (isRight) {
+                // Resize duration (for month view)
+                const daysDelta = Math.round(deltaX / 100); // Approximate day width
+                const newEnd = new Date(originalEnd.getTime() + (daysDelta * 24 * 60 * 60 * 1000));
+                if (newEnd > originalStart) {
+                    event.end_time = newEnd.toISOString();
+                }
+            }
+            
+            this.render(); // Re-render to show changes
+        };
+        
+        const mouseUpHandler = () => {
+            document.removeEventListener('mousemove', mouseMoveHandler);
+            document.removeEventListener('mouseup', mouseUpHandler);
+            
+            // Save the resized event
+            this.app.saveEvent(event);
+        };
+        
+        document.addEventListener('mousemove', mouseMoveHandler);
+        document.addEventListener('mouseup', mouseUpHandler);
+    }
+
+    moveEvent(eventId, targetSlot) {
+        const event = this.app.events.find(e => e.id === eventId);
+        if (!event) return;
+        
+        const targetDate = targetSlot.dataset.date;
+        const targetHour = targetSlot.dataset.hour || '09';
+        
+        if (!targetDate) return;
+        
+        const originalStart = new Date(event.start_time);
+        const originalEnd = new Date(event.end_time);
+        const duration = originalEnd.getTime() - originalStart.getTime();
+        
+        // Create new start time
+        const newStart = new Date(`${targetDate}T${targetHour.padStart(2, '0')}:${originalStart.getMinutes().toString().padStart(2, '0')}`);
+        const newEnd = new Date(newStart.getTime() + duration);
+        
+        // Update event
+        event.start_time = newStart.toISOString();
+        event.end_time = newEnd.toISOString();
+        
+        // Save and re-render
+        this.app.saveEvent(event);
     }
 
     attachEventListeners() {
@@ -232,9 +439,19 @@ export class Calendar {
         const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour later
         
         this.app.eventModal.show(null, {
-            start_time: startTime.toISOString().slice(0, 16),
-            end_time: endTime.toISOString().slice(0, 16)
+            start_time: this.formatDateTimeLocal(startTime),
+            end_time: this.formatDateTimeLocal(endTime)
         });
+    }
+
+    formatDateTimeLocal(date) {
+        const year = date.getFullYear();
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        const day = date.getDate().toString().padStart(2, '0');
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
     }
 
     isToday(date) {
