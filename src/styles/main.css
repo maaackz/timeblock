@@ -242,6 +242,7 @@ main {
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0,0,0,0.08);
     overflow: hidden;
+    position: relative;
 }
 
 /* Month View */
@@ -377,6 +378,7 @@ main {
 .week-body, .day-body {
     display: flex;
     flex-direction: column;
+    position: relative;
 }
 
 .time-row {
@@ -420,10 +422,18 @@ main {
     border: 2px dashed #3498db;
 }
 
-.event-block {
+/* Event containers for absolute positioning */
+.week-events-container, .day-events-container {
     position: absolute;
-    left: 2px;
-    right: 2px;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+    z-index: 5;
+}
+
+.event-block {
     border-radius: 4px;
     padding: 4px 8px;
     font-size: 12px;
@@ -431,6 +441,8 @@ main {
     transition: all 0.2s ease;
     z-index: 10;
     user-select: none;
+    pointer-events: auto;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 .event-block:hover {
@@ -442,6 +454,9 @@ main {
 .event-title {
     font-weight: 600;
     margin-bottom: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .event-time {

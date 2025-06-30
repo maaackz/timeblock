@@ -71,6 +71,7 @@ export class TemplateManager {
         sidebar.innerHTML = html;
         this.attachTemplateListeners();
         this.setupTemplateDropZone();
+        this.setupDragAndDrop(); // Re-setup drag and drop after rendering
     }
 
     attachTemplateListeners() {
@@ -85,14 +86,16 @@ export class TemplateManager {
     }
 
     setupDragAndDrop() {
-        const templateBlocks = document.querySelectorAll('.template-block');
+        const templateBlocks = document.querySelectorAll('.template-block[data-template-id]');
         
         templateBlocks.forEach(block => {
             block.addEventListener('dragstart', (e) => {
                 const templateId = block.dataset.templateId;
                 const template = this.templates.find(t => t.id === templateId);
                 if (template) {
+                    // Set both JSON data and plain text for compatibility
                     e.dataTransfer.setData('application/json', JSON.stringify(template));
+                    e.dataTransfer.setData('text/plain', JSON.stringify(template));
                     e.dataTransfer.effectAllowed = 'copy';
                     block.style.opacity = '0.5';
                 }
@@ -105,13 +108,15 @@ export class TemplateManager {
     }
 
     setupEventToTemplateConversion() {
-        // This will be called when events are dragged to the template area
+        // Listen for dragstart on the document to catch event drags
         document.addEventListener('dragstart', (e) => {
             if (e.target.classList.contains('event-preview') || e.target.classList.contains('event-block')) {
                 const eventId = e.target.dataset.eventId;
                 const event = this.app.events.find(ev => ev.id === eventId);
                 if (event) {
+                    // Store event data for template creation
                     e.dataTransfer.setData('event-data', JSON.stringify(event));
+                    e.dataTransfer.setData('text/plain', event.title);
                 }
             }
         });
@@ -128,7 +133,10 @@ export class TemplateManager {
         });
 
         dropZone.addEventListener('dragleave', (e) => {
-            dropZone.classList.remove('drag-over');
+            // Only remove drag-over if we're actually leaving the drop zone
+            if (!dropZone.contains(e.relatedTarget)) {
+                dropZone.classList.remove('drag-over');
+            }
         });
 
         dropZone.addEventListener('drop', (e) => {
@@ -136,13 +144,30 @@ export class TemplateManager {
             dropZone.classList.remove('drag-over');
             
             try {
+                // Try to get event data first
                 const eventData = e.dataTransfer.getData('event-data');
                 if (eventData) {
                     const event = JSON.parse(eventData);
                     this.createTemplateFromEvent(event);
+                    return;
+                }
+                
+                // If no event data, check for other data types
+                const textData = e.dataTransfer.getData('text/plain');
+                if (textData) {
+                    try {
+                        const parsedData = JSON.parse(textData);
+                        if (parsedData.title && parsedData.start_time) {
+                            // This looks like an event
+                            this.createTemplateFromEvent(parsedData);
+                        }
+                    } catch (parseError) {
+                        console.log('Could not parse dropped text as event data');
+                    }
                 }
             } catch (error) {
-                console.error('Failed to create template from event:', error);
+                console.error('Failed to create template from dropped item:', error);
+                alert('Failed to create template. Please try again.');
             }
         });
     }
@@ -158,15 +183,14 @@ export class TemplateManager {
             id: Date.now().toString(),
             title: event.title,
             duration: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`,
-            backgroundColor: event.background_color,
-            textColor: event.text_color,
+            backgroundColor: event.background_color || '#2874A6',
+            textColor: event.text_color || '#ffffff',
             tags: event.tags || ''
         };
 
         this.templates.push(template);
         this.saveTemplates();
         this.renderTemplates();
-        this.setupDragAndDrop();
         
         alert(`Template "${template.title}" created successfully!`);
     }
@@ -175,7 +199,10 @@ export class TemplateManager {
         const date = dropTarget.dataset.date;
         const hour = dropTarget.dataset.hour || '09';
         
-        if (!date) return;
+        if (!date) {
+            console.error('No date found on drop target');
+            return;
+        }
 
         // Parse duration
         const [hours, minutes] = template.duration.split(':').map(Number);
@@ -188,8 +215,8 @@ export class TemplateManager {
             title: template.title,
             start_time: startTime.toISOString(),
             end_time: endTime.toISOString(),
-            background_color: template.backgroundColor,
-            text_color: template.textColor,
+            background_color: template.backgroundColor || '#2874A6',
+            text_color: template.textColor || '#ffffff',
             tags: template.tags || '',
             recurring: 'none'
         };
@@ -206,7 +233,6 @@ export class TemplateManager {
         this.templates.push(newTemplate);
         this.saveTemplates();
         this.renderTemplates();
-        this.setupDragAndDrop();
     }
 
     deleteTemplate(templateId) {
@@ -214,7 +240,6 @@ export class TemplateManager {
             this.templates = this.templates.filter(t => t.id !== templateId);
             this.saveTemplates();
             this.renderTemplates();
-            this.setupDragAndDrop();
         }
     }
 }
