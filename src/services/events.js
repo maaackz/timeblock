@@ -1,8 +1,10 @@
 import { supabase, isSupabaseConfigured } from './supabase.js';
+import { AuthService } from './auth.js';
 
 export class EventService {
     constructor() {
         this.tableName = 'events';
+        this.authService = new AuthService();
     }
 
     async getEvents() {
@@ -33,7 +35,7 @@ export class EventService {
                     events[index] = eventData;
                 }
             } else {
-                // Create new
+                // Create new - use numeric ID for localStorage
                 eventData.id = Date.now().toString();
                 events.push(eventData);
             }
@@ -42,11 +44,23 @@ export class EventService {
             return eventData;
         }
 
-        if (eventData.id) {
-            // Update existing event
+        // Get current user for Supabase operations
+        const user = await this.authService.getCurrentUser();
+        if (!user) {
+            throw new Error('User must be authenticated to save events');
+        }
+
+        // Prepare event data with user_id
+        const eventPayload = {
+            ...eventData,
+            user_id: user.id
+        };
+
+        if (eventData.id && this.isValidUUID(eventData.id)) {
+            // Update existing event - only if ID is a valid UUID
             const { data, error } = await supabase
                 .from(this.tableName)
-                .update(eventData)
+                .update(eventPayload)
                 .eq('id', eventData.id)
                 .select()
                 .single();
@@ -54,10 +68,12 @@ export class EventService {
             if (error) throw error;
             return data;
         } else {
-            // Create new event
+            // Create new event - remove any existing ID to let Supabase generate UUID
+            const { id, ...eventWithoutId } = eventPayload;
+            
             const { data, error } = await supabase
                 .from(this.tableName)
-                .insert([eventData])
+                .insert([eventWithoutId])
                 .select()
                 .single();
 
@@ -101,5 +117,11 @@ export class EventService {
 
         if (error) throw error;
         return data || [];
+    }
+
+    // Helper method to validate UUID format
+    isValidUUID(str) {
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        return uuidRegex.test(str);
     }
 }
