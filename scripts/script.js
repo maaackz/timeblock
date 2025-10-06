@@ -632,8 +632,11 @@ ${percent(minsInYear, totalYearMins)}% of total year
             // Add click handler for deletion
             deleteBtn.addEventListener('click', function (e) {
                 e.stopPropagation(); // Prevent triggering template drag/edit
-                div.remove();
-                saveTemplateBlocksToStorage();
+                const templateTitle = data.title;
+                if (confirm(`Are you sure you want to delete the template "${templateTitle}"?`)) {
+                    div.remove();
+                    saveTemplateBlocksToStorage();
+                }
             });
 
             // Add click handler for editing to the CONTENT area
@@ -679,8 +682,11 @@ ${percent(minsInYear, totalYearMins)}% of total year
         // Add click handler for deletion
         deleteBtn.addEventListener('click', function (e) {
             e.stopPropagation();
-            div.remove();
-            saveTemplateBlocksToStorage();
+            const templateTitle = data.title;
+            if (confirm(`Are you sure you want to delete the template "${templateTitle}"?`)) {
+                div.remove();
+                saveTemplateBlocksToStorage();
+            }
         });
 
         // Add click handler for editing to the CONTENT area
@@ -739,9 +745,13 @@ ${percent(minsInYear, totalYearMins)}% of total year
 
     function deleteTemplate() {
         if (currentEditingTemplate) {
-            currentEditingTemplate.remove();
-            saveTemplateBlocksToStorage();
-            closeModal();
+            const data = JSON.parse(currentEditingTemplate.getAttribute('data-event'));
+            const templateTitle = data.title;
+            if (confirm(`Are you sure you want to delete the template "${templateTitle}"?`)) {
+                currentEditingTemplate.remove();
+                saveTemplateBlocksToStorage();
+                closeModal();
+            }
         }
     }
 
@@ -1261,19 +1271,26 @@ ${percent(minsInYear, totalYearMins)}% of total year
             try {
                 const imported = JSON.parse(event.target.result);
 
-                // Import calendar events
-                if (imported.calendarEvents) {
+                // Handle different import formats
+                if (Array.isArray(imported)) {
+                    // Direct array of events (like your JSON file)
+                    localStorage.setItem('calendarEvents', JSON.stringify(imported));
+                } else if (imported.calendarEvents) {
+                    // Full backup format with calendarEvents property
                     localStorage.setItem('calendarEvents', JSON.stringify(imported.calendarEvents));
-                }
+                    
+                    // Import user settings
+                    if (imported.userSettings) {
+                        localStorage.setItem('userSettings', JSON.stringify(imported.userSettings));
+                    }
 
-                // Import user settings
-                if (imported.userSettings) {
-                    localStorage.setItem('userSettings', JSON.stringify(imported.userSettings));
-                }
-
-                // Import templates
-                if (imported.templateBlocks) {
-                    localStorage.setItem('templateBlocks', JSON.stringify(imported.templateBlocks));
+                    // Import templates
+                    if (imported.templateBlocks) {
+                        localStorage.setItem('templateBlocks', JSON.stringify(imported.templateBlocks));
+                    }
+                } else {
+                    // Try to import as calendar events if it's an object with event-like properties
+                    localStorage.setItem('calendarEvents', JSON.stringify([imported]));
                 }
 
                 // Refresh UI
@@ -1285,7 +1302,8 @@ ${percent(minsInYear, totalYearMins)}% of total year
                 alert('Import successful!');
 
             } catch (err) {
-                alert('Invalid backup file.');
+                console.error('Import error:', err);
+                alert('Invalid backup file. Please check the file format.');
             }
         };
         reader.readAsText(file);
